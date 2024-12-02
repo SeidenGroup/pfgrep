@@ -8,6 +8,21 @@ than QShell grep or using a PASE iconv/Rfile with grep in a shell script.
 
 Just run `make`. You'll have a `pfgrep` binary.
 
+## Examples
+
+Search for the string "CRASH" in case insentive mode (including i.e. "crash")
+in a member:
+
+```shell
+pfgrep -i crash /QSYS.LIB/CALVIN.LIB/QCLSRC.FILE/LOOP.MBR
+```
+
+Search for VxRx references in the ILE C header files:
+
+```shell
+pfgrep '[Vv][0-9][Rr][0-9]' /QIBM/include/*.h
+```
+
 ## Usage
 
 The first argument is a (PCRE) regular expression and all subsequent arguments
