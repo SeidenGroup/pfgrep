@@ -6,9 +6,13 @@ than QShell grep or using a PASE iconv/Rfile with grep in a shell script.
 
 ## Building
 
-Install `pcre2-devel`, then just run `make`. You'll have a `pfgrep` binary.
+- Install `pcre2-devel` using `yum install pcre2-devel`
+- Download the pfgrep project files into a directory in the IFS
+- From the project directory, run the `make` command, as shown here:
+  - IBM i 7.2 and 7.3: `make`
+  - IBM i 7.4, 7.5, and newer: `make CC=gcc-10` 
 
-On i 7.4 or newer, you may need to use `make CC=gcc-10`.
+If the compile succeeds,  you'll now have a `pfgrep` binary.
 
 ## Examples
 
