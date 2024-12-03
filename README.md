@@ -8,6 +8,8 @@ than QShell grep or using a PASE iconv/Rfile with grep in a shell script.
 
 Install `pcre2-devel`, then just run `make`. You'll have a `pfgrep` binary.
 
+On i 7.4, you may need to use `make CC=gcc-10`.
+
 ## Examples
 
 Search for the string "CRASH" in case insentive mode (including i.e. "crash")
