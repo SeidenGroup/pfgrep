@@ -6,7 +6,7 @@ than QShell grep or using a PASE iconv/Rfile with grep in a shell script.
 
 ## Building
 
-Just run `make`. You'll have a `pfgrep` binary.
+Install `pcre2-devel`, then just run `make`. You'll have a `pfgrep` binary.
 
 ## Examples
 
