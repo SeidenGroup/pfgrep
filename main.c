@@ -223,7 +223,13 @@ static int do_file(pfgrep *state, File *file)
 	// Determine the record length, the API to do this needs traditional paths.
 	// Note that it will resolve symlinks for us, so i.e. /QIBM/include works
 	char lib_name[29], obj_name[29], mbr_name[29];
-	filename_to_libobj(filename, lib_name, obj_name, mbr_name);
+	int ret = filename_to_libobj(filename, lib_name, obj_name, mbr_name);
+	if (ret == -1) {
+		if (!state->silent) {
+			fprintf(stderr, "opening %s: Failed to convert IFS path to object name\n", filename);
+		}
+		goto fail;
+	}
 	int file_record_size = get_record_size(lib_name, obj_name);
 	if (file_record_size == -2) {
 		if (!state->silent) {
