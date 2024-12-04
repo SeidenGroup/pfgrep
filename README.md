@@ -47,8 +47,6 @@ The flags that can be passed are:
 
 ## Ideas/Plans
 
-* Recursion into *FILEs passed as to automatically look at their members
-  * Similar for directories, i.e. `/QIBM/include/sys`
 * Context lines (requires refactor to keep previous lines)
 * Enable PCRE JIT (may require rebuild or vendoring)
 * Multithreaded searches using i.e. a queue
