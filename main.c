@@ -43,6 +43,8 @@ typedef struct pfgrep_state {
 	bool print_nonmatching_files : 1;
 	bool print_count : 1;
 	bool recurse : 1;
+	bool match_word : 1;
+	bool match_line : 1;
 } pfgrep;
 
 typedef struct pfgrep_file {
@@ -58,7 +60,7 @@ static int do_thing(pfgrep *state, const char *filename);
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-cHhiLlnqrstv] EXPR files...\n", argv0);
+	fprintf(stderr, "usage: %s [-cHhiLlnqrstwvx] EXPR files...\n", argv0);
 }
 
 uint32_t get_compile_flags(pfgrep *state)
@@ -66,6 +68,18 @@ uint32_t get_compile_flags(pfgrep *state)
 	uint32_t flags = 0;
 	if (state->case_insensitive) {
 		flags |= PCRE2_CASELESS;
+	}
+	return flags;
+}
+
+uint32_t get_extra_compile_flags(pfgrep *state)
+{
+	uint32_t flags = 0;
+	if (state->match_word) {
+		flags |= PCRE2_EXTRA_MATCH_WORD;
+	}
+	if (state->match_line) {
+		flags |= PCRE2_EXTRA_MATCH_LINE;
 	}
 	return flags;
 }
@@ -294,7 +308,7 @@ int main(int argc, char **argv)
 	pfgrep state = {0};
 
 	int ch;
-	while ((ch = getopt(argc, argv, "cHhLlinqrstv")) != -1) {
+	while ((ch = getopt(argc, argv, "cHhLlinqrstwvx")) != -1) {
 		switch (ch) {
 		case 'c':
 			state.print_count = true;
@@ -334,8 +348,14 @@ int main(int argc, char **argv)
 		case 't':
 			state.trim_ending_whitespace = true;
 			break;
+		case 'w':
+			state.match_word = true;
+			break;
 		case 'v':
 			state.invert = true;
+			break;
+		case 'x':
+			state.match_line = true;
 			break;
 		default:
 			usage(argv[0]);
@@ -352,8 +372,14 @@ int main(int argc, char **argv)
 	state.expr = argv[optind++];
 	int errornumber;
 	PCRE2_SIZE erroroffset;
-	uint32_t pcre_opts = get_compile_flags(&state);
-	state.re = pcre2_compile((PCRE2_SPTR)state.expr, PCRE2_ZERO_TERMINATED, pcre_opts, &errornumber, &erroroffset, NULL);
+	pcre2_compile_context *compile_ctx = pcre2_compile_context_create(NULL);
+	pcre2_set_compile_extra_options(compile_ctx, get_extra_compile_flags(&state));
+	state.re = pcre2_compile((PCRE2_SPTR)state.expr,
+			PCRE2_ZERO_TERMINATED,
+			get_compile_flags(&state),
+			&errornumber,
+			&erroroffset,
+			compile_ctx);
 	if (state.re == NULL) {
 		PCRE2_UCHAR buffer[256];
 		pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
