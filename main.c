@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/errno.h>
+#include <sys/mode.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -267,7 +268,8 @@ static int do_thing(pfgrep *state, const char *filename)
 		}
 		return -1;
 	}
-	if (strcmp(s.st_objtype, "*FILE     ") == 0 || strcmp(s.st_objtype, "*DIR      ") == 0) {
+	// objtype is *FILE or *DIR, check for mode though to avoid i.e. SAVFs
+	if (S_ISDIR(s.st_mode)) {
 		if (state->recurse) {
 			int subdir_files_matched = do_directory(state, filename);
 			if (subdir_files_matched >= 0) {
