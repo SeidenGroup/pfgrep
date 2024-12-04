@@ -189,7 +189,13 @@ static int do_directory(pfgrep *state, const char *directory)
 		// XXX: Technically on i, it might be faster to chdir rather
 		// than use a full path, since resolution is faster from CWD
 		char full_path[PATH_MAX + 1];
-		snprintf(full_path, sizeof(full_path), "%s/%s", directory, dirent->d_name);
+		// Avoid doubling the / if user has a trailing one passed
+		// XXX: Should normalize these before the QSYS name conversion
+		if (directory[strlen(directory) - 1] == '/' ) {
+			snprintf(full_path, sizeof(full_path), "%s%s", directory, dirent->d_name);
+		} else {
+			snprintf(full_path, sizeof(full_path), "%s/%s", directory, dirent->d_name);
+		}
 		do_thing(state, full_path);
 		errno = 0; // Don't let i.e. iconv errors influence the next call
 	}
