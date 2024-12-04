@@ -156,7 +156,7 @@ static int do_directory(pfgrep *state, const char *directory)
 	DIR *dir = opendir(directory);
 	if (dir == NULL) {
 		if (!state->silent) {
-			snprintf(msg, sizeof(msg), "opening directory or physical file %s\n", directory);
+			snprintf(msg, sizeof(msg), "opening directory or physical file %s", directory);
 			perror_xpf(msg);
 		}
 		return -1;
@@ -180,7 +180,7 @@ static int do_directory(pfgrep *state, const char *directory)
 	}
 	if (errno != 0) {
 		if (!state->silent) {
-			snprintf(msg, sizeof(msg), "reading dirent in %s\n", directory);
+			snprintf(msg, sizeof(msg), "reading dirent in %s", directory);
 			perror_xpf(msg);
 		}
 	}
