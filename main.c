@@ -63,7 +63,7 @@ static void usage(char *argv0)
 	fprintf(stderr, "usage: %s [-cHhiLlnqrstwvx] EXPR files...\n", argv0);
 }
 
-uint32_t get_compile_flags(pfgrep *state)
+static uint32_t get_compile_flags(pfgrep *state)
 {
 	uint32_t flags = 0;
 	if (state->case_insensitive) {
@@ -72,7 +72,7 @@ uint32_t get_compile_flags(pfgrep *state)
 	return flags;
 }
 
-uint32_t get_extra_compile_flags(pfgrep *state)
+static uint32_t get_extra_compile_flags(pfgrep *state)
 {
 	uint32_t flags = 0;
 	if (state->match_word) {
