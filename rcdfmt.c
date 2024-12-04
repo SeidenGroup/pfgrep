@@ -65,8 +65,8 @@ QDBRTVFD (char *output, const int *outlen, char *output_filename, const char *fo
 int get_record_size(const char *lib_name, const char *obj_name)
 {
 	char filename[20], output_filename[20]; /* 10 chars of lib, 10 chars of obj */
-	strncpy(filename, obj_name, 10);
-	strncpy(filename + 10, lib_name, 10);
+	memcpy(filename, obj_name, 10);
+	memcpy(filename + 10, lib_name, 10);
 	/* Ensure filename is space and not null padded */
 	for (int i = 0; i < 20; i++) {
 		if (filename[i] == '\0') {
