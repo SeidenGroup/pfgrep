@@ -6,6 +6,7 @@
 
 #include <as400_protos.h>
 #include <as400_types.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -40,14 +41,23 @@ typedef struct pfgrep_state {
 	bool print_matching_files : 1;
 	bool print_nonmatching_files : 1;
 	bool print_count : 1;
+	bool recurse : 1;
 } pfgrep;
+
+typedef struct pfgrep_file {
+	const char *filename; // IFS
+	int fd;
+	int ccsid;
+	int record_length;
+} File;
 
 int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name);
 int get_record_size(const char *lib_name, const char *obj_name);
+static int do_thing(pfgrep *state, const char *filename);
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-cHhiLlnqstv] EXPR files...\n", argv0);
+	fprintf(stderr, "usage: %s [-cHhiLlnqrstv] EXPR files...\n", argv0);
 }
 
 uint32_t get_compile_flags(pfgrep *state)
@@ -136,45 +146,64 @@ fail:
 	return matches;
 }
 
-static int do_file(pfgrep *state, const char *filename)
+/**
+ * Recurse through a directory or physical file.
+ */
+static int do_directory(pfgrep *state, const char *directory)
+{
+	char msg[PATH_MAX + 256];
+	int files_matched = 0;
+	DIR *dir = opendir(directory);
+	if (dir == NULL) {
+		if (!state->silent) {
+			snprintf(msg, sizeof(msg), "opening directory or physical file %s\n", directory);
+			perror_xpf(msg);
+		}
+		return -1;
+	}
+	struct dirent *dirent = NULL;
+	while ((dirent = readdir(dir)) != NULL) {
+		if (strcmp(dirent->d_name, ".") == 0 || strcmp(dirent->d_name, "..") == 0) {
+			continue;
+		}
+
+		// Raise the file count in case single dir/PF passed,
+		// so filenames of subdirectories are printed
+		state->file_count++;
+
+		// XXX: Technically on i, it might be faster to chdir rather
+		// than use a full path, since resolution is faster from CWD
+		char full_path[PATH_MAX + 1];
+		snprintf(full_path, sizeof(full_path), "%s/%s", directory, dirent->d_name);
+		do_thing(state, full_path);
+		errno = 0; // Don't let i.e. iconv errors influence the next call
+	}
+	if (errno != 0) {
+		if (!state->silent) {
+			snprintf(msg, sizeof(msg), "reading dirent in %s\n", directory);
+			perror_xpf(msg);
+		}
+	}
+	closedir(dir);
+	return files_matched;
+}
+
+static int do_file(pfgrep *state, File *file)
 {
 	char msg[PATH_MAX + 256];
 	int matches = -1;
 	iconv_t conv = (iconv_t)(-1);
-	int fd = open(filename, O_RDONLY);
-	// It may be better to stat the file w/ path before opening. It opens
-	// the possiblity of TOCTOU issues, but it'd give us better error
-	// reporting since open fails before we can fstat it.
-	if (fd == -1 && errno == EOPNOTSUPP) {
-		if (!state->silent) {
-			fprintf(stderr, "opening %s: Not a normal physical file\n", filename);
-		}
-		return -1;
-	} else if (fd == -1) {
+	const char *filename = file->filename;
+	int fd = open(file->filename, O_RDONLY);
+	// We let do_file fill in the filename and CCSID. Technically a TOCTOU
+	// problem, but open(2) error reporting with IBM i objects is goofy.
+	if (fd == -1) {
 		if (!state->silent) {
 			snprintf(msg, sizeof(msg), "opening %s", filename);
 			perror_xpf(msg);
 		}
 		return -1;
 	}
-
-	// Determine the CCSID and type of the file
-	struct stat64_ILE s = {0};
-	int ret = fstatx(fd, (struct stat*)&s, sizeof(s), STX_XPFSS_PASE);
-	if (ret == -1) {
-		if (!state->silent) {
-			snprintf(msg, sizeof(msg), "getting CCSID of %s", filename);
-			perror_xpf(msg);
-		}
-		goto fail;
-	}
-	if (strcmp(s.st_objtype, "*MBR      ") != 0) {
-		if (!state->silent) {
-			fprintf(stderr, "opening %s: Not a normal physical file\n", filename);
-		}
-		goto fail;
-	}
-	int ccsid = s.st_ccsid; // or st_codepage?
 
 	// Determine the record length, the API to do this needs traditional paths.
 	// Note that it will resolve symlinks for us, so i.e. /QIBM/include works
@@ -183,7 +212,7 @@ static int do_file(pfgrep *state, const char *filename)
 	int file_record_size = get_record_size(lib_name, obj_name);
 	if (file_record_size == -2) {
 		if (!state->silent) {
-			fprintf(stderr, "opening %s: Not a source physical file\n", filename);
+			fprintf(stderr, "opening %s: Not a source physical file member\n", filename);
 		}
 		goto fail;
 	} else if (file_record_size == -1) {
@@ -196,7 +225,7 @@ static int do_file(pfgrep *state, const char *filename)
 	file_record_size -= 12;
 
 	// Open a conversion for this CCSID (XXX: Should cache)
-	conv = iconv_open(ccsidtocs(Qp2paseCCSID()), ccsidtocs(ccsid));
+	conv = iconv_open(ccsidtocs(Qp2paseCCSID()), ccsidtocs(file->ccsid));
 	if (conv == (iconv_t)(-1)) {
 		if (!state->silent) {
 			perror("iconv");
@@ -221,12 +250,49 @@ fail:
 	return matches;
 }
 
+static int do_thing(pfgrep *state, const char *filename)
+{
+	char msg[PATH_MAX + 256];
+	int matches = 0;
+	struct stat64_ILE s = {0};
+	File f;
+
+	f.filename = filename;
+	// IBM messed up the statx declaration, it doesn't write
+	int ret = statx((char*)filename, (struct stat*)&s, sizeof(s), STX_XPFSS_PASE);
+	if (ret == -1) {
+		if (!state->silent) {
+			snprintf(msg, sizeof(msg), "stat(%s)", filename);
+			perror_xpf(msg);
+		}
+		return -1;
+	}
+	if (strcmp(s.st_objtype, "*FILE     ") == 0 || strcmp(s.st_objtype, "*DIR      ") == 0) {
+		if (state->recurse) {
+			int subdir_files_matched = do_directory(state, filename);
+			if (subdir_files_matched >= 0) {
+				matches += subdir_files_matched;
+			}
+		} else {
+			if (!state->silent) {
+				fprintf(stderr, "stat(%s): Is a directory or physical file\n", filename);
+			}
+			return -1;
+		}
+	} else if (strcmp(s.st_objtype, "*MBR      ") == 0) {
+		f.ccsid = s.st_ccsid; // or st_codepage?
+		return do_file(state, &f);
+	}
+	// XXX: Message for non-PF/members?
+	return matches;
+}
+
 int main(int argc, char **argv)
 {
 	pfgrep state = {0};
 
 	int ch;
-	while ((ch = getopt(argc, argv, "cHhLlinqstv")) != -1) {
+	while ((ch = getopt(argc, argv, "cHhLlinqrstv")) != -1) {
 		switch (ch) {
 		case 'c':
 			state.print_count = true;
@@ -256,6 +322,9 @@ int main(int argc, char **argv)
 			break;
 		case 'q':
 			state.quiet = true;
+			break;
+		case 'r':
+			state.recurse = true;
 			break;
 		case 's':
 			state.silent = true;
@@ -293,7 +362,7 @@ int main(int argc, char **argv)
 	state.file_count = argc - optind;
 	bool any_match = false, any_error = false;
 	for (int i = optind; i < argc; i++) {
-		int ret = do_file(&state, argv[i]);
+		int ret = do_thing(&state, argv[i]);
 		if (ret > 0) {
 			any_match = true;
 		} else if (ret < 0) {
