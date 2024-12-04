@@ -41,9 +41,12 @@ The flags that can be passed are:
 * `-L`: Shows filenames that did match. Implies `-q`.
 * `-n`: Shows the line number of a match. Note this is *not* the sequence number of a record; this is not yet supported.
 * `-q`: Doesn't print matches. The return code of pfgrep is unchanged though, so this is useful for i.e. conditionals in a script.
+* `-r`: Recurses into directories, be it IFS directories, libraries, or physical files.
 * `-s`: Doesn't print error messages. The return code of pfgrep is unchanged.
 * `-t`: Trims whitespace at the end of lines; by default, pfgrep doesn't, so there are spaces at the end to match record padding.
+* `-w`: Match only whole words.
 * `-v`: Inverts matches; lines that don't match will match and be printed et vice versa.
+* `-w`: Match only whole line.
 
 ## Ideas/Plans
 
@@ -52,3 +55,4 @@ The flags that can be passed are:
 * Multithreaded searches using i.e. a queue
 * Memoize/cache values (i.e. record length, iconv converters)
 * Multiline semantics (requires similar refactor for context)
+* Work with sequence numbers and dates for records
