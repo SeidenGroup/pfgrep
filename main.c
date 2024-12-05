@@ -23,6 +23,11 @@
 
 #include "errc.h"
 
+#ifdef free
+#undef free
+#endif
+#define free(x)
+
 typedef struct pfgrep_state {
 	/* Files */
 	int file_count;

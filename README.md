@@ -93,6 +93,8 @@ The first argument is a (PCRE) regular expression and all subsequent arguments
 are filenames (IFS style) of physical file members. The full path to members
 must be specified; it does not yet recurse into just a file.
 
+For information on PCRE regex syntax, consult [PCRE docs][pcre2syntax].
+
 The flags that can be passed are:
 
 * `-c`: Counts the matched lines in each file. Implies `-q`.
@@ -119,3 +121,5 @@ The flags that can be passed are:
 * Memoize/cache values (i.e. record length, iconv converters)
 * Multiline semantics (requires similar refactor for context)
 * Work with sequence numbers and dates for records
+
+[pcre2syntax]: https://www.pcre.org/current/doc/html/pcre2syntax.html
