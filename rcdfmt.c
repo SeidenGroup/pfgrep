@@ -5,13 +5,12 @@
  */
 
 #include <as400_protos.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <json_object.h>
 
 #include "ebcdic.h"
 #include "errc.h"
@@ -64,15 +63,60 @@ QDBRTVFD (char *output, const int *outlen, char *output_filename, const char *fo
 	}
 }
 
-static json_object *cached_record_sizes = NULL;
+/*
+ * This is sqrt(SIZE_MAX+1), as s1*s2 <= SIZE_MAX
+ * if both s1 < MUL_NO_OVERFLOW and s2 < MUL_NO_OVERFLOW
+ */
+#define MUL_NO_OVERFLOW	((size_t)1 << (sizeof(size_t) * 4))
+
+void *
+reallocarray(void *optr, size_t nmemb, size_t size)
+{
+	if ((nmemb >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
+	    nmemb > 0 && SIZE_MAX / nmemb < size) {
+		errno = ENOMEM;
+		return NULL;
+	}
+	return realloc(optr, size * nmemb);
+}
+
+typedef struct {
+	char name[20];
+	int16_t length;
+} CachedEntry;
+
+static CachedEntry *cached_record_sizes = NULL;
+static size_t cached_record_entries = 0;
+
+static CachedEntry *get_cached_entry(const char name[20])
+{
+	if (cached_record_entries == 0) {
+		return NULL;
+	}
+	for (size_t i = 0; i < cached_record_entries; i++) {
+		if (memcmp(cached_record_sizes[i].name, name, 20) == 0) {
+			return &cached_record_sizes[i];
+		}
+	}
+	return NULL;
+}
+
+static void append_cached_entry(const char name[20], int16_t length)
+{
+	cached_record_sizes = reallocarray(cached_record_sizes, ++cached_record_entries, sizeof(CachedEntry));
+	if (cached_record_sizes == NULL) {
+		abort();
+	}
+	memcpy(cached_record_sizes[cached_record_entries - 1].name, name, 20);
+	cached_record_sizes[cached_record_entries - 1].length = length;
+}
 
 int get_record_size(const char *lib_name, const char *obj_name)
 {
-	// 10 chars of object name, 10 chars of lib name, null terminator for JSON
-	char filename[21], output_filename[21];
+	// 10 chars of object name, 10 chars of lib name
+	char filename[21], output_filename[20];
 	memcpy(filename, obj_name, 10);
 	memcpy(filename + 10, lib_name, 10);
-	filename[20] = '\0';
 	/* Ensure filename is space and not null padded */
 	for (int i = 0; i < 20; i++) {
 		if (filename[i] == '\0') {
@@ -81,12 +125,9 @@ int get_record_size(const char *lib_name, const char *obj_name)
 	}
 
 	// Look at our cached records first
-	if (cached_record_sizes == NULL) {
-		cached_record_sizes = json_object_new_object();
-	}
-	json_object *cached_record_size = json_object_object_get(cached_record_sizes, filename);
+	CachedEntry *cached_record_size = get_cached_entry(filename);
 	if (cached_record_size != NULL) {
-		return json_object_get_int(cached_record_size);
+		return cached_record_size->length;
 	}
 
 	/* It might look at the output filename... */
@@ -110,9 +151,9 @@ int get_record_size(const char *lib_name, const char *obj_name)
 		return -2;
 	}
 
-	int Qdbfmxrl = *(int16_t*)(output + 304);
+	int16_t Qdbfmxrl = *(int16_t*)(output + 304);
 
-	json_object_object_add(cached_record_sizes, filename, json_object_new_int(Qdbfmxrl));
+	append_cached_entry(filename, Qdbfmxrl);
 
 	return Qdbfmxrl;
 }

@@ -1,11 +1,9 @@
 # DESTDIR can be set as well
 PREFIX := /QOpenSys/pkgs
 
-# Can be overriden for your own PCRE2 or json-c build
+# Can be overriden for your own PCRE2 build
 PCRE2_CFLAGS := $(shell pkg-config --cflags libpcre2-8)
 PCRE2_LDFLAGS := $(shell pkg-config --libs libpcre2-8)
-JSONC_CFLAGS := $(shell pkg-config --cflags json-c)
-JSONC_LDFLAGS := $(shell pkg-config --libs json-c)
 
 # Build with warnings as errors and symbols for developers,
 # build with optimizations for release builds.
@@ -26,10 +24,10 @@ LD := $(CC)
 .PHONY: clean install dist
 
 pfgrep: main.o errc.o ebcdic.o convpath.o rcdfmt.o
-	$(LD) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
-	$(CC) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(CFLAGS) -c -o $@ $^
+	$(CC) $(PCRE2_CFLAGS) $(CFLAGS) -c -o $@ $^
 
 clean:
 	rm -f *.o pfgrep core
