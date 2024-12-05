@@ -15,11 +15,13 @@ CFLAGS := -std=gnu11 -Wall -Wextra -O2
 LDFLAGS := -O2
 endif
 
+VERSION := 0.1
+
 # Use gcc 10 from Yum if available, otherwise try regular gcc on PATH
 CC := $(shell if type gcc-10 > /dev/null 2> /dev/null; then echo gcc-10; else echo gcc; fi)
 LD := $(CC)
 
-.PHONY: clean install
+.PHONY: clean install dist
 
 pfgrep: main.o errc.o ebcdic.o convpath.o rcdfmt.o
 	$(LD) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
@@ -32,3 +34,7 @@ clean:
 
 install: pfgrep
 	install -D -m 755 pfgrep $(DESTDIR)$(PREFIX)/bin/pfgrep
+
+dist:
+	# This assumes git
+	git archive --prefix=pfgrep-$(VERSION)/ --format=tar.gz -o pfgrep-$(VERSION).tar.gz HEAD README.md COPYING *.c *.h
