@@ -69,7 +69,7 @@ The flags that can be passed are:
 * `-t`: Trims whitespace at the end of lines; by default, pfgrep doesn't, so there are spaces at the end to match record padding.
 * `-w`: Match only whole words.
 * `-v`: Inverts matches; lines that don't match will match and be printed et vice versa.
-* `-w`: Match only whole line.
+* `-x`: Match only a whole line.
 
 ## Ideas/Plans
 
