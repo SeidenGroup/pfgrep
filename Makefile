@@ -23,7 +23,7 @@ LD := $(CC)
 
 .PHONY: clean install dist
 
-pfgrep: main.o errc.o ebcdic.o convpath.o rcdfmt.o
+pfgrep: main.o errc.o ebcdic.o convpath.o rcdfmt.o reallocarray.o
 	$(LD) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
