@@ -57,6 +57,7 @@ must be specified; it does not yet recurse into just a file.
 The flags that can be passed are:
 
 * `-c`: Counts the matched lines in each file. Implies `-q`.
+* `-F`: Don't use a regular expression, match substrings literally.
 * `-H`: Always preprends the matched filename, even if only one member was passed.
 * `-h`: Never preprends the matched filename, even if only multiple members were passed.
 * `-i`: Matches are case insensitive.

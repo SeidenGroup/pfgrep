@@ -45,6 +45,7 @@ typedef struct pfgrep_state {
 	bool recurse : 1;
 	bool match_word : 1;
 	bool match_line : 1;
+	bool fixed : 1;
 } pfgrep;
 
 typedef struct pfgrep_file {
@@ -60,7 +61,7 @@ static int do_thing(pfgrep *state, const char *filename);
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-cHhiLlnqrstwvx] EXPR files...\n", argv0);
+	fprintf(stderr, "usage: %s [-cFHhiLlnqrstwvx] EXPR files...\n", argv0);
 }
 
 static uint32_t get_compile_flags(pfgrep *state)
@@ -68,6 +69,12 @@ static uint32_t get_compile_flags(pfgrep *state)
 	uint32_t flags = 0;
 	if (state->case_insensitive) {
 		flags |= PCRE2_CASELESS;
+	}
+	// XXX: We might consider using i.e. str(case)str instead, since it's
+	// possibly faster than using PCRE, but it does work w/ the other PCRE
+	// flags like matching words/lines, so...
+	if (state->fixed) {
+		flags |= PCRE2_LITERAL;
 	}
 	return flags;
 }
@@ -320,11 +327,14 @@ int main(int argc, char **argv)
 	pfgrep state = {0};
 
 	int ch;
-	while ((ch = getopt(argc, argv, "cHhLlinqrstwvx")) != -1) {
+	while ((ch = getopt(argc, argv, "cFHhLlinqrstwvx")) != -1) {
 		switch (ch) {
 		case 'c':
 			state.print_count = true;
 			state.quiet = true; // Implied
+			break;
+		case 'F':
+			state.fixed = true;
 			break;
 		case 'H':
 			state.always_print_filename = true;
