@@ -4,7 +4,29 @@ pfgrep is a fast (with lots on the table for future optimization) way to search
 with regular expressions (using PCRE2) in physical file members. It's faster
 than QShell grep or using a PASE iconv/Rfile with grep in a shell script.
 
-## Building
+## Installation
+
+We provide binary builds - look in the releases for RPM packages. Packages are
+also provided in the Seiden Group repository for our customers.
+
+To install the RPM, copy the RPM somewhere to the IFS and run:
+
+```shell
+yum install /path/to/pfgrep.rpm
+```
+
+You may need to use `update` instead of `install` for future updates.
+
+If you have our repository, run:
+
+```shell
+yum install pfgrep
+```
+
+If you don't want to install the RPM or want to work on pfgrep, follow the
+instructions below to build from
+
+## Building from source
 
 Clone the repository somewhere:
 
