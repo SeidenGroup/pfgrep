@@ -37,4 +37,4 @@ install: pfgrep
 
 dist:
 	# This assumes git
-	git archive --prefix=pfgrep-$(VERSION)/ --format=tar.gz -o pfgrep-$(VERSION).tar.gz HEAD README.md COPYING *.c *.h
+	git archive --prefix=pfgrep-$(VERSION)/ --format=tar.gz -o pfgrep-$(VERSION).tar.gz HEAD Makefile README.md COPYING *.c *.h
