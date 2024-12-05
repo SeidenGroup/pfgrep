@@ -90,8 +90,8 @@ Note that expansions with globs are performed by the shell, and not pfgrep.
 ## Usage
 
 The first argument is a (PCRE) regular expression and all subsequent arguments
-are filenames (IFS style) of physical file members. The full path to members
-must be specified; it does not yet recurse into just a file.
+are filenames (IFS style) of physical file members, symbolic links to members,
+or if recursion is enabled, directories/files/members that contain these.
 
 For information on PCRE regex syntax, consult [PCRE docs][pcre2syntax].
 
