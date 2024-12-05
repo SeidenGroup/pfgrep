@@ -35,7 +35,7 @@ your `PATH`.
 
 ## Examples
 
-Search for the string "CRASH" in case insentive mode (including i.e. "crash")
+Search for the string "CRASH" in case insensitive mode (including i.e. "crash")
 in a member:
 
 ```shell
