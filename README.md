@@ -73,6 +73,20 @@ Search for VxRx references in the ILE C header files:
 pfgrep '[Vv][0-9][Rr][0-9]' /QIBM/include/*.h
 ```
 
+Search for the word "function" recursively in several libraries and files:
+
+```shell
+pfgrep -w -r 'function' /QSYS.LIB/PROD.LIB /QSYS.LIB/DEV.LIB /QSYS.LIB/ALICE.LIB/ROBERT.FILE
+```
+
+Search recursively with a regular expression:
+
+```shell
+pfgrep -r 'pfgrep -r '^#(define|pragma).*Qp0l.*Attr' /QSYS.LIB/QSYSINC.LIB/H.FILE
+```
+
+Note that expansions with globs are performed by the shell, and not pfgrep.
+
 ## Usage
 
 The first argument is a (PCRE) regular expression and all subsequent arguments
