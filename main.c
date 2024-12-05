@@ -145,10 +145,10 @@ static int iter_records(pfgrep *state, const char *filename, int fd, iconv_t con
 				goto fail;
 			} else if (!state->quiet) {
 				if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
-					printf("%s: ", filename);
+					printf("%s:", filename);
 				}
 				if (state->print_line_numbers) {
-					printf("%d: ", line);
+					printf("%d:", line);
 				}
 				printf("%s\n", conv_buf);
 			}
