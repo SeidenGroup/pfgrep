@@ -30,8 +30,11 @@ make
 make DEBUG=1
 ```
 
-You'll have a `pfgrep` binary. You can run it directly, or put it somewhere in
-your `PATH`.
+You'll have a `pfgrep` binary. You can run it directly, or install the binary:
+
+```shell
+make install
+```
 
 ## Examples
 

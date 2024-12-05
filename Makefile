@@ -1,3 +1,6 @@
+# DESTDIR can be set as well
+PREFIX := /QOpenSys/pkgs
+
 # Can be overriden for your own PCRE2 build
 PCRE2_CFLAGS := $(shell pkg-config --cflags libpcre2-8)
 PCRE2_LDFLAGS := $(shell pkg-config --libs libpcre2-8)
@@ -16,7 +19,7 @@ endif
 CC := $(shell if type gcc-10 > /dev/null 2> /dev/null; then echo gcc-10; else echo gcc; fi)
 LD := $(CC)
 
-.PHONY: clean
+.PHONY: clean install
 
 pfgrep: main.o errc.o ebcdic.o convpath.o rcdfmt.o
 	$(LD) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
@@ -26,3 +29,6 @@ pfgrep: main.o errc.o ebcdic.o convpath.o rcdfmt.o
 
 clean:
 	rm -f *.o pfgrep core
+
+install: pfgrep
+	install -D -m 755 pfgrep $(DESTDIR)$(PREFIX)/bin/pfgrep
