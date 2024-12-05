@@ -23,10 +23,11 @@
 
 #include "errc.h"
 
-#ifdef free
-#undef free
-#endif
-#define free(x)
+// These contain conversions from convs[N] to system PASE CCSID, memoized to
+// avoid constantly reopening iconv for conversion. Gets closed on exit.
+// Because we only convert to a single CCSID, we can keep the maping flat.
+// The memory cost of this should be minimal on modern systems.
+iconv_t convs[UINT16_MAX] = {0};
 
 typedef struct pfgrep_state {
 	/* Files */
@@ -56,8 +57,8 @@ typedef struct pfgrep_state {
 typedef struct pfgrep_file {
 	const char *filename; // IFS
 	int fd;
-	int ccsid;
 	int record_length;
+	uint16_t ccsid;
 } File;
 
 int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name);
@@ -67,6 +68,16 @@ static int do_thing(pfgrep *state, const char *filename);
 static void usage(char *argv0)
 {
 	fprintf(stderr, "usage: %s [-cFHhiLlnqrstwvx] EXPR files...\n", argv0);
+}
+
+static iconv_t get_iconv(uint16_t ccsid)
+{
+	iconv_t conv = convs[ccsid];
+	if (conv == NULL || conv == (iconv_t)(-1)) {
+		conv = iconv_open(ccsidtocs(Qp2paseCCSID()), ccsidtocs(ccsid));
+		convs[ccsid] = conv;
+	}
+	return conv;
 }
 
 static uint32_t get_compile_flags(pfgrep *state)
@@ -264,7 +275,7 @@ static int do_file(pfgrep *state, File *file)
 	file_record_size -= 12;
 
 	// Open a conversion for this CCSID (XXX: Should cache)
-	conv = iconv_open(ccsidtocs(Qp2paseCCSID()), ccsidtocs(file->ccsid));
+	conv = get_iconv(file->ccsid);
 	if (conv == (iconv_t)(-1)) {
 		if (!state->silent) {
 			perror("iconv");
@@ -282,9 +293,6 @@ static int do_file(pfgrep *state, File *file)
 		printf("%s:%d\n", filename, matches);
 	}
 fail:
-	if (conv != (iconv_t)(-1)) {
-		iconv_close(conv);
-	}
 	close(fd);
 	return matches;
 }
@@ -425,6 +433,16 @@ int main(int argc, char **argv)
 		}
 	}
 
+	// This deinitialization may be unnecessary, do it for future use of
+	// sanitizers/*grind when available on i
 	pcre2_code_free(state.re);
+	for (int i = 0; i < UINT16_MAX; i++) {
+		iconv_t conv = convs[i];
+		if (conv == NULL || conv == (iconv_t)(-1)) {
+			continue;
+		}
+		iconv_close(conv);
+	}
+
 	return any_error ? 2 : (any_match ? 0 : 1);
 }
