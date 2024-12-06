@@ -98,7 +98,7 @@ static void append_cached_entry(const char name[20], int16_t length)
 int get_record_size(const char *lib_name, const char *obj_name)
 {
 	// 10 chars of object name, 10 chars of lib name
-	char filename[21], output_filename[20];
+	char filename[20], output_filename[20];
 	memcpy(filename, obj_name, 10);
 	memcpy(filename + 10, lib_name, 10);
 	/* Ensure filename is space and not null padded */
@@ -115,7 +115,7 @@ int get_record_size(const char *lib_name, const char *obj_name)
 	}
 
 	/* It might look at the output filename... */
-	memcpy(output_filename, filename, 21);
+	memcpy(output_filename, filename, 20);
 
 	/* XXX: Convert to using a Qdb_Qdbfh structure... */
 	char output[8192];
