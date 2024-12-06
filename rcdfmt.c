@@ -70,14 +70,14 @@ typedef struct {
 } CachedEntry;
 
 static CachedEntry *cached_record_sizes = NULL;
-static size_t cached_record_entries = 0;
+static ssize_t cached_record_entries = 0;
 
 static CachedEntry *get_cached_entry(const char name[20])
 {
 	if (cached_record_entries == 0) {
 		return NULL;
 	}
-	for (size_t i = 0; i < cached_record_entries; i++) {
+	for (ssize_t i = cached_record_entries - 1; i >= 0; i--) {
 		if (memcmp(cached_record_sizes[i].name, name, 20) == 0) {
 			return &cached_record_sizes[i];
 		}
@@ -91,11 +91,8 @@ static void append_cached_entry(const char name[20], int16_t length)
 	if (cached_record_sizes == NULL) {
 		abort();
 	}
-	// We're likelier to use the one we just inserted again, but we might
-	// need to revisit earlier entries. Move them back then insert front.
-	memmove(cached_record_sizes + 1, cached_record_sizes, (cached_record_entries - 1) * sizeof(CachedEntry));
-	memcpy(cached_record_sizes[0].name, name, 20);
-	cached_record_sizes[0].length = length;
+	memcpy(cached_record_sizes[cached_record_entries - 1].name, name, 20);
+	cached_record_sizes[cached_record_entries - 1].length = length;
 }
 
 int get_record_size(const char *lib_name, const char *obj_name)
