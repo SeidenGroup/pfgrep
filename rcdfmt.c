@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <json_object.h>
+
 #include "ebcdic.h"
 #include "errc.h"
 
@@ -62,19 +64,38 @@ QDBRTVFD (char *output, const int *outlen, char *output_filename, const char *fo
 	}
 }
 
+static json_object *cached_record_sizes = NULL;
+
+void free_cached_record_sizes(void)
+{
+	json_object_put(cached_record_sizes);
+}
+
 int get_record_size(const char *lib_name, const char *obj_name)
 {
-	char filename[20], output_filename[20]; /* 10 chars of lib, 10 chars of obj */
+	// 10 chars of object name, 10 chars of lib name, null terminator for JSON
+	char filename[21], output_filename[21];
 	memcpy(filename, obj_name, 10);
 	memcpy(filename + 10, lib_name, 10);
+	filename[20] = '\0';
 	/* Ensure filename is space and not null padded */
 	for (int i = 0; i < 20; i++) {
 		if (filename[i] == '\0') {
 			filename[i] = 0x40; /* EBCDIC ' ' */
 		}
 	}
+
+	// Look at our cached records first
+	if (cached_record_sizes == NULL) {
+		cached_record_sizes = json_object_new_object();
+	}
+	json_object *cached_record_size = json_object_object_get(cached_record_sizes, filename);
+	if (cached_record_size != NULL) {
+		return json_object_get_int(cached_record_size);
+	}
+
 	/* It might look at the output filename... */
-	memcpy(output_filename, filename, 20);
+	memcpy(output_filename, filename, 21);
 
 	/* XXX: Convert to using a Qdb_Qdbfh structure... */
 	char output[8192];
@@ -95,6 +116,9 @@ int get_record_size(const char *lib_name, const char *obj_name)
 	}
 
 	int Qdbfmxrl = *(int16_t*)(output + 304);
+
+	// Safe to use JSON_C_OBJECT_ADD_KEY_IS_NEW since we check beforehand
+	json_object_object_add_ex(cached_record_sizes, filename, json_object_new_int(Qdbfmxrl), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 
 	return Qdbfmxrl;
 }

@@ -38,7 +38,7 @@ cd pfgrep
 Install necessary dependencies:
 
 ```shell
-yum install pcre2-devel pkg-config make-gnu gcc
+yum install json-c-devel pcre2-devel pkg-config make-gnu gcc
 # Needed on IBM i 7.4 or newer, older GCC can't handle newer versions' headers
 yum install gcc-10
 ```

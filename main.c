@@ -20,6 +20,7 @@
 #include </QOpenSys/usr/include/iconv.h>
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
+#include <linkhash.h>
 
 #include "errc.h"
 
@@ -64,6 +65,7 @@ typedef struct pfgrep_file {
 int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name);
 int get_record_size(const char *lib_name, const char *obj_name);
 static int do_thing(pfgrep *state, const char *filename);
+void free_cached_record_sizes(void);
 
 static void usage(char *argv0)
 {
@@ -339,6 +341,12 @@ int main(int argc, char **argv)
 {
 	pfgrep state = {0};
 
+	// The default hashing algorithm linkhash uses is fine, but since we
+	// deal with 20 character strings with few allowed characters, it
+	// should be safe to use the simpler "Perl-like" hash, which is a bit
+	// faster than the default.
+	json_global_set_string_hash(JSON_C_STR_HASH_PERLLIKE);
+
 	int ch;
 	while ((ch = getopt(argc, argv, "cFHhLlinqrstwvx")) != -1) {
 		switch (ch) {
@@ -443,6 +451,7 @@ int main(int argc, char **argv)
 		}
 		iconv_close(conv);
 	}
+	free_cached_record_sizes();
 
 	return any_error ? 2 : (any_match ? 0 : 1);
 }
