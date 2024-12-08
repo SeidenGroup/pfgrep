@@ -348,6 +348,11 @@ static int do_thing(pfgrep *state, const char *filename)
 			}
 			return -1;
 		}
+	} else if (s.st_size == 0) {
+		// This is either a logical file or such (we can't open these
+		// yet), or a supported empty file that would have no matches.
+		// Avoid bothering the user (per GH-1)
+		return 0;
 	} else if (strcmp(s.st_objtype, "*MBR      ") == 0) {
 		f.ccsid = s.st_ccsid; // or st_codepage?
 		return do_file(state, &f);
