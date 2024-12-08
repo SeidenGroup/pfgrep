@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/errno.h>
 
 #include <json_object.h>
 
@@ -60,7 +61,6 @@ QDBRTVFD (char *output, const int *outlen, char *output_filename, const char *fo
 	};
 	if (0 != _PGMCALL(&QDBRTVFD_pgm, pgm_argv, PGMCALL_EXCP_NOSIGNAL)) {
 		perror_xpf("QDBRTVFD");
-		abort();
 	}
 }
 
@@ -71,7 +71,12 @@ void free_cached_record_sizes(void)
 	json_object_put(cached_record_sizes);
 }
 
-int get_record_size(const char *lib_name, const char *obj_name)
+/**
+ * Gets information about a physical file. Returns the record length as a
+ * positive number if source PF, as a negative number if not, and 0 if error.
+ * errno is set when 0 on error is returned.
+ */
+int get_pf_info(const char *lib_name, const char *obj_name)
 {
 	// 10 chars of object name, 10 chars of lib name, null terminator for JSON
 	char filename[21], output_filename[21];
@@ -108,17 +113,28 @@ int get_record_size(const char *lib_name, const char *obj_name)
 
 	QDBRTVFD(output, &outlen, output_filename, FILD0100, filename, _FIRST, &override, _FILETYPE, _INT, &errc);
 	if (errc.exception_id[0] != '\0') {
-		return -1;
+		// XXX: Translate common messages like CPF5715 into ENOENT, etc.
+		errno = ENOSYS;
+		return 0;
 	}
 
-	if (!(output[8] & 8)) { // if Qdbfhfsu is not *SRC
-		return -2;
+	// Is this a logical file?
+	bool Qdbfhfpl = output[8] & 0x20;
+	if (Qdbfhfpl) {
+		errno = ENODEV;
+		return 0;
 	}
 
+	// Is this a source PF?
+	bool Qdbfhfsu = output[8] & 0x08;
+	// Record length
 	int Qdbfmxrl = *(int16_t*)(output + 304);
 
-	// Safe to use JSON_C_OBJECT_ADD_KEY_IS_NEW since we check beforehand
-	json_object_object_add_ex(cached_record_sizes, filename, json_object_new_int(Qdbfmxrl), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+	// Compress return value into a single integer that's easily stored
+	int ret = Qdbfhfsu ? Qdbfmxrl : -Qdbfmxrl;
 
-	return Qdbfmxrl;
+	// Safe to use JSON_C_OBJECT_ADD_KEY_IS_NEW since we check beforehand
+	json_object_object_add_ex(cached_record_sizes, filename, json_object_new_int(ret), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+
+	return ret;
 }

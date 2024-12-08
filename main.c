@@ -63,7 +63,7 @@ typedef struct pfgrep_file {
 } File;
 
 int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name);
-int get_record_size(const char *lib_name, const char *obj_name);
+int get_pf_info(const char *lib_name, const char *obj_name);
 static int do_thing(pfgrep *state, const char *filename);
 void free_cached_record_sizes(void);
 
@@ -249,16 +249,7 @@ static int do_file(pfgrep *state, File *file)
 	int matches = -1;
 	iconv_t conv = (iconv_t)(-1);
 	const char *filename = file->filename;
-	int fd = open(file->filename, O_RDONLY);
-	// We let do_file fill in the filename and CCSID. Technically a TOCTOU
-	// problem, but open(2) error reporting with IBM i objects is goofy.
-	if (fd == -1) {
-		if (!state->silent) {
-			snprintf(msg, sizeof(msg), "opening %s", filename);
-			perror_xpf(msg);
-		}
-		return -1;
-	}
+	int fd = -1;
 
 	// Determine the record length, the API to do this needs traditional paths.
 	// Note that it will resolve symlinks for us, so i.e. /QIBM/include works
@@ -270,20 +261,37 @@ static int do_file(pfgrep *state, File *file)
 		}
 		goto fail;
 	}
-	int file_record_size = get_record_size(lib_name, obj_name);
-	if (file_record_size == -2) {
+	int file_record_size = get_pf_info(lib_name, obj_name);
+	if (file_record_size == 0 && errno == ENODEV) {
 		if (!state->silent) {
-			fprintf(stderr, "opening %s: Not a source physical file member\n", filename);
+			fprintf(stderr, "opening %s: Not a physical file member\n", filename);
 		}
 		goto fail;
-	} else if (file_record_size == -1) {
+	} else if (file_record_size == 0) {
 		if (!state->silent) {
 			fprintf(stderr, "opening %s: Couldn't get record length\n", filename);
 		}
 		goto fail;
+	} else if (file_record_size < 0) {
+		// Non-source PF, signedness is used as source PF bit
+		file_record_size = -file_record_size;
+	} else {
+		// Source PF, length includes other metadata not pulled when
+		// reading source PFs via POSIX APIs
+		file_record_size -= 12;
 	}
-	// Record size includes other metadata not pulled in on read
-	file_record_size -= 12;
+
+	// Only open after we know it's a valid thing to open.
+	fd = open(file->filename, O_RDONLY);
+	// We let do_file fill in the filename and CCSID. Technically a TOCTOU
+	// problem, but open(2) error reporting with IBM i objects is goofy.
+	if (fd == -1) {
+		if (!state->silent) {
+			snprintf(msg, sizeof(msg), "opening %s", filename);
+			perror_xpf(msg);
+		}
+		return -1;
+	}
 
 	// Open a conversion for this CCSID (XXX: Should cache)
 	conv = get_iconv(file->ccsid);
@@ -304,7 +312,9 @@ static int do_file(pfgrep *state, File *file)
 		printf("%s:%d\n", filename, matches);
 	}
 fail:
-	close(fd);
+	if (fd != -1) {
+		close(fd);
+	}
 	return matches;
 }
 
