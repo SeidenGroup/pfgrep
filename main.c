@@ -118,7 +118,16 @@ static int iter_records(pfgrep *state, const char *filename, int fd, iconv_t con
 	// XXX: This could use the sequence and date numbers in the PF
 	int matches = 0;
 	int line = 0;
-	while ((bytes_read = read(fd, read_buf, record_length)) != 0) {	
+	while ((bytes_read = read(fd, read_buf, record_length)) != 0) {
+		if (bytes_read == -1) {
+			if (!state->silent) {
+				char msg[256 + PATH_MAX];
+				snprintf(msg, sizeof(msg), "read(%s, %d)", filename, record_length);
+				perror_xpf(msg);
+			}
+			matches = -1;
+			goto fail;
+		}
 		read_buf[record_length] = '\0';
 		// XXX: Check if bytes_read < record_length
 		char *in = read_buf, *out = conv_buf;
