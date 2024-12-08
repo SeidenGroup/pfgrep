@@ -297,7 +297,8 @@ static int do_file(pfgrep *state, File *file)
 	conv = get_iconv(file->ccsid);
 	if (conv == (iconv_t)(-1)) {
 		if (!state->silent) {
-			perror("iconv");
+			snprintf(msg, sizeof(msg), "iconv(%d, %d)", Qp2paseCCSID(), file->ccsid);
+			perror(msg);
 		}
 		goto fail;
 	}
