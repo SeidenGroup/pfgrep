@@ -205,7 +205,7 @@ static int do_directory(pfgrep *state, const char *directory)
 	DIR *dir = opendir(directory);
 	if (dir == NULL) {
 		if (!state->silent) {
-			snprintf(msg, sizeof(msg), "opening directory or physical file %s", directory);
+			snprintf(msg, sizeof(msg), "opendir(%s)", directory);
 			perror_xpf(msg);
 		}
 		return -1;
@@ -257,19 +257,19 @@ static int do_file(pfgrep *state, File *file)
 	int ret = filename_to_libobj(filename, lib_name, obj_name, mbr_name);
 	if (ret == -1) {
 		if (!state->silent) {
-			fprintf(stderr, "opening %s: Failed to convert IFS path to object name\n", filename);
+			fprintf(stderr, "filename_to_libobj(%s): Failed to convert IFS path to object name\n", filename);
 		}
 		goto fail;
 	}
 	int file_record_size = get_pf_info(lib_name, obj_name);
 	if (file_record_size == 0 && errno == ENODEV) {
 		if (!state->silent) {
-			fprintf(stderr, "opening %s: Not a physical file member\n", filename);
+			fprintf(stderr, "get_pf_info(%s): Not a physical file member\n", filename);
 		}
 		goto fail;
 	} else if (file_record_size == 0) {
 		if (!state->silent) {
-			fprintf(stderr, "opening %s: Couldn't get record length\n", filename);
+			fprintf(stderr, "get_pf_info(%s): Couldn't get record length\n", filename);
 		}
 		goto fail;
 	} else if (file_record_size < 0) {
@@ -287,7 +287,7 @@ static int do_file(pfgrep *state, File *file)
 	// problem, but open(2) error reporting with IBM i objects is goofy.
 	if (fd == -1) {
 		if (!state->silent) {
-			snprintf(msg, sizeof(msg), "opening %s", filename);
+			snprintf(msg, sizeof(msg), "open(%s)", filename);
 			perror_xpf(msg);
 		}
 		return -1;
@@ -297,7 +297,7 @@ static int do_file(pfgrep *state, File *file)
 	conv = get_iconv(file->ccsid);
 	if (conv == (iconv_t)(-1)) {
 		if (!state->silent) {
-			snprintf(msg, sizeof(msg), "iconv(%d, %d)", Qp2paseCCSID(), file->ccsid);
+			snprintf(msg, sizeof(msg), "iconv_open(%d, %d)", Qp2paseCCSID(), file->ccsid);
 			perror(msg);
 		}
 		goto fail;
