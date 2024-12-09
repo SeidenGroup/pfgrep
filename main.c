@@ -243,35 +243,28 @@ static int do_directory(pfgrep *state, const char *directory)
 	return files_matched;
 }
 
-static int do_file(pfgrep *state, File *file)
+static bool set_record_length(pfgrep *state, File *file)
 {
-	char msg[PATH_MAX + 256];
-	int matches = -1;
-	iconv_t conv = (iconv_t)(-1);
-	const char *filename = file->filename;
-	int fd = -1;
-
 	// Determine the record length, the API to do this needs traditional paths.
 	// Note that it will resolve symlinks for us, so i.e. /QIBM/include works
 	char lib_name[29], obj_name[29], mbr_name[29];
-	int ret = filename_to_libobj(filename, lib_name, obj_name, mbr_name);
+	const char *filename = file->filename;
+	int ret = filename_to_libobj(file->filename, lib_name, obj_name, mbr_name);
 	if (ret == -1) {
 		if (!state->silent) {
 			fprintf(stderr, "filename_to_libobj(%s): Failed to convert IFS path to object name\n", filename);
 		}
-		goto fail;
+		return false;
 	}
 	int file_record_size = get_pf_info(lib_name, obj_name);
 	if (file_record_size == 0 && errno == ENODEV) {
-		if (!state->silent) {
-			fprintf(stderr, "get_pf_info(%s): Not a physical file member\n", filename);
-		}
-		goto fail;
+		// Ignore files we can't support w/ POSIX I/O for now
+		return false;
 	} else if (file_record_size == 0) {
 		if (!state->silent) {
 			fprintf(stderr, "get_pf_info(%s): Couldn't get record length\n", filename);
 		}
-		goto fail;
+		return false;
 	} else if (file_record_size < 0) {
 		// Non-source PF, signedness is used as source PF bit
 		file_record_size = -file_record_size;
@@ -280,6 +273,16 @@ static int do_file(pfgrep *state, File *file)
 		// reading source PFs via POSIX APIs
 		file_record_size -= 12;
 	}
+	return true;
+}
+
+static int do_file(pfgrep *state, File *file)
+{
+	char msg[PATH_MAX + 256];
+	int matches = -1;
+	iconv_t conv = (iconv_t)(-1);
+	const char *filename = file->filename;
+	int fd = -1;
 
 	// Only open after we know it's a valid thing to open.
 	fd = open(file->filename, O_RDONLY);
@@ -293,7 +296,7 @@ static int do_file(pfgrep *state, File *file)
 		return -1;
 	}
 
-	// Open a conversion for this CCSID (XXX: Should cache)
+	// Open a conversion for this CCSID
 	conv = get_iconv(file->ccsid);
 	if (conv == (iconv_t)(-1)) {
 		if (!state->silent) {
@@ -303,7 +306,7 @@ static int do_file(pfgrep *state, File *file)
 		goto fail;
 	}
 
-	matches = iter_records(state, filename, fd, conv, file_record_size);
+	matches = iter_records(state, filename, fd, conv, file->record_length);
 	if (matches == 0 && state->print_nonmatching_files) {
 		printf("%s\n", filename);
 	} else if (matches > 0 && state->print_matching_files) {
@@ -352,10 +355,13 @@ static int do_thing(pfgrep *state, const char *filename)
 	} else if (s.st_size == 0) {
 		// This is either a logical file or such (we can't open these
 		// yet), or a supported empty file that would have no matches.
-		// Avoid bothering the user (per GH-1)
+		// Avoid bothering the user (per GH-3)
 		return 0;
 	} else if (strcmp(s.st_objtype, "*MBR      ") == 0) {
 		f.ccsid = s.st_ccsid; // or st_codepage?
+		if (!set_record_length(state, &f)) {
+			return -1; // messages emited in function
+		}
 		return do_file(state, &f);
 	}
 	// XXX: Message for non-PF/members?

@@ -118,6 +118,9 @@ int get_pf_info(const char *lib_name, const char *obj_name)
 		return 0;
 	}
 
+	// We use POSIX I/O to read record files, and this has limits:
+	// https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system
+
 	// Is this a logical file?
 	bool Qdbfhfpl = output[8] & 0x20;
 	if (Qdbfhfpl) {
@@ -127,6 +130,18 @@ int get_pf_info(const char *lib_name, const char *obj_name)
 
 	// Is this a source PF?
 	bool Qdbfhfsu = output[8] & 0x08;
+
+	// How many fields do we have?
+	int16_t Qdbfmxfnum = *(int16_t*)(output + 206);
+	// Is this program or externally described?
+	// We can only use program described with a single field, source PFs,
+	// or externally described, since we open as binary.
+	bool Qdbfpgmd = output[60] & 0x70;
+	if (!Qdbfhfsu && (!Qdbfpgmd || Qdbfmxfnum < 2)) {
+		errno = ENODEV;
+		return 0;
+	}
+
 	// Record length
 	int Qdbfmxrl = *(int16_t*)(output + 304);
 
