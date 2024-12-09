@@ -109,6 +109,8 @@ int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *
 		char path[1024];
 	} input_qlg  = {0};
 	utf2ebcdic(input, 1000, input_qlg.path);
+	// /QSYS.LIB/... path names are coerced to 37
+	input_qlg.qlg.CCSID = 37;
 	input_qlg.qlg.Path_Length = strlen(input_qlg.path);
 	input_qlg.qlg.Path_Name_Delimiter[0] = 0x61; // ebcdic slash
 
@@ -117,7 +119,7 @@ int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *
 	ERRC0100 errc = {0};
 	errc.bytes_in = sizeof(errc);
 
-	Qp0lCvtPathToQSYSObjName(&input_qlg.qlg, &qsys, QSYS0100_name, sizeof(qsys), 0, (ERRC0100*)&errc);
+	Qp0lCvtPathToQSYSObjName(&input_qlg.qlg, &qsys, QSYS0100_name, sizeof(qsys), 37, (ERRC0100*)&errc);
 	if (errc.exception_id[0] != '\0') {
 		/* likely CPFA0DB */
 		return -1;

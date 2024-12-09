@@ -15,8 +15,11 @@ static iconv_t e2a, a2e;
 static void
 init_iconv (void)
 {
-	e2a = iconv_open(ccsidtocs(Qp2paseCCSID()), ccsidtocs(Qp2jobCCSID()));
-	a2e = iconv_open(ccsidtocs(Qp2jobCCSID()), ccsidtocs(Qp2paseCCSID()));
+	// We use the encoding of a file for the grep part, but /QSYS.LIB names
+	// are coerced to 37, and exception IDs are the same in all encodings.
+	// Thus, it's not worth it to use the job CCSID.
+	e2a = iconv_open(ccsidtocs(Qp2paseCCSID()), ccsidtocs(37));
+	a2e = iconv_open(ccsidtocs(37), ccsidtocs(Qp2paseCCSID()));
 	if (e2a == (iconv_t)(-1) || a2e == (iconv_t)(-1)) {
 		fprintf(stderr, "Failed to open iconv for utility functions\n");
 		abort();
