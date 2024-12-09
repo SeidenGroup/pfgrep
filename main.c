@@ -267,11 +267,11 @@ static bool set_record_length(pfgrep *state, File *file)
 		return false;
 	} else if (file_record_size < 0) {
 		// Non-source PF, signedness is used as source PF bit
-		file_record_size = -file_record_size;
+		file->record_length = -file_record_size;
 	} else {
 		// Source PF, length includes other metadata not pulled when
 		// reading source PFs via POSIX APIs
-		file_record_size -= 12;
+		file->record_length = file_record_size - 12;
 	}
 	return true;
 }
