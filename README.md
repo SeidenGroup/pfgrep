@@ -103,7 +103,7 @@ The flags that can be passed are:
 * `-h`: Never preprends the matched filename, even if only multiple members were passed.
 * `-i`: Matches are case insensitive.
 * `-L`: Shows filenames that didn't match. Implies `-q`.
-* `-L`: Shows filenames that did match. Implies `-q`.
+* `-l`: Shows filenames that did match. Implies `-q`.
 * `-n`: Shows the line number of a match. Note this is *not* the sequence number of a record; this is not yet supported.
 * `-p`: Searches non-source physical files. Note that non-source PFs are [subject to limitations][qsyslib-limits] (pfgrep reads PFs in binary mode).
 * `-q`: Doesn't print matches. The return code of pfgrep is unchanged though, so this is useful for i.e. conditionals in a script.
@@ -113,15 +113,6 @@ The flags that can be passed are:
 * `-w`: Match only whole words.
 * `-v`: Inverts matches; lines that don't match will match and be printed et vice versa.
 * `-x`: Match only a whole line.
-
-## Ideas/Plans
-
-* Context lines (requires refactor to keep previous lines)
-* Enable PCRE JIT (may require rebuild or vendoring)
-* Multithreaded searches using i.e. a queue
-* Memoize/cache values (i.e. record length, iconv converters)
-* Multiline semantics (requires similar refactor for context)
-* Work with sequence numbers and dates for records
 
 [pcre2syntax]: https://www.pcre.org/current/doc/html/pcre2syntax.html
 [qsyslib-limits]: https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system
