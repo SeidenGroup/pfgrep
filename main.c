@@ -37,6 +37,7 @@ typedef struct pfgrep_state {
 	const char *expr;
 	pcre2_code *re;
 	/* Options */
+	bool search_non_source_files : 1;
 	bool trim_ending_whitespace : 1;
 	bool case_insensitive : 1;
 	bool always_print_filename : 1;
@@ -69,7 +70,7 @@ void free_cached_record_sizes(void);
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-cFHhiLlnqrstwvx] EXPR files...\n", argv0);
+	fprintf(stderr, "usage: %s [-cFHhiLlnpqrstwvx] EXPR files...\n", argv0);
 }
 
 static iconv_t get_iconv(uint16_t ccsid)
@@ -265,15 +266,17 @@ static bool set_record_length(pfgrep *state, File *file)
 			fprintf(stderr, "get_pf_info(%s): Couldn't get record length\n", filename);
 		}
 		return false;
-	} else if (file_record_size < 0) {
+	} else if (file_record_size < 0 && state->search_non_source_files) {
 		// Non-source PF, signedness is used as source PF bit
 		file->record_length = -file_record_size;
+		return true;
 	} else {
 		// Source PF, length includes other metadata not pulled when
 		// reading source PFs via POSIX APIs
 		file->record_length = file_record_size - 12;
+		return true;
 	}
-	return true;
+	return false;
 }
 
 static int do_file(pfgrep *state, File *file)
@@ -379,7 +382,7 @@ int main(int argc, char **argv)
 	json_global_set_string_hash(JSON_C_STR_HASH_PERLLIKE);
 
 	int ch;
-	while ((ch = getopt(argc, argv, "cFHhLlinqrstwvx")) != -1) {
+	while ((ch = getopt(argc, argv, "cFHhLlinpqrstwvx")) != -1) {
 		switch (ch) {
 		case 'c':
 			state.print_count = true;
@@ -409,6 +412,9 @@ int main(int argc, char **argv)
 			break;
 		case 'n':
 			state.print_line_numbers = true;
+			break;
+		case 'p':
+			state.search_non_source_files = true;
 			break;
 		case 'q':
 			state.quiet = true;

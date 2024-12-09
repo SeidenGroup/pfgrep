@@ -105,6 +105,7 @@ The flags that can be passed are:
 * `-L`: Shows filenames that didn't match. Implies `-q`.
 * `-L`: Shows filenames that did match. Implies `-q`.
 * `-n`: Shows the line number of a match. Note this is *not* the sequence number of a record; this is not yet supported.
+* `-p`: Searches non-source physical files. Note that non-source PFs are [subject to limitations][qsyslib-limits] (pfgrep reads PFs in binary mode).
 * `-q`: Doesn't print matches. The return code of pfgrep is unchanged though, so this is useful for i.e. conditionals in a script.
 * `-r`: Recurses into directories, be it IFS directories, libraries, or physical files.
 * `-s`: Doesn't print error messages. The return code of pfgrep is unchanged.
@@ -123,3 +124,4 @@ The flags that can be passed are:
 * Work with sequence numbers and dates for records
 
 [pcre2syntax]: https://www.pcre.org/current/doc/html/pcre2syntax.html
+[qsyslib-limits]: https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system
