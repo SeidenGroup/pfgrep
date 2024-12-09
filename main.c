@@ -65,7 +65,7 @@ typedef struct pfgrep_file {
 
 int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name);
 int get_pf_info(const char *lib_name, const char *obj_name);
-static int do_thing(pfgrep *state, const char *filename);
+static int do_thing(pfgrep *state, const char *filename, bool from_recursion);
 void free_cached_record_sizes(void);
 
 static void usage(char *argv0)
@@ -231,7 +231,10 @@ static int do_directory(pfgrep *state, const char *directory)
 		} else {
 			snprintf(full_path, sizeof(full_path), "%s/%s", directory, dirent->d_name);
 		}
-		do_thing(state, full_path);
+		int ret = do_thing(state, full_path, true);
+		if (ret > 0) {
+			files_matched += ret;
+		}
 		errno = 0; // Don't let i.e. iconv errors influence the next call
 	}
 	if (errno != 0) {
@@ -325,7 +328,7 @@ fail:
 	return matches;
 }
 
-static int do_thing(pfgrep *state, const char *filename)
+static int do_thing(pfgrep *state, const char *filename, bool from_recursion)
 {
 	char msg[PATH_MAX + 256];
 	int matches = 0;
@@ -363,9 +366,9 @@ static int do_thing(pfgrep *state, const char *filename)
 	} else if (strcmp(s.st_objtype, "*MBR      ") == 0) {
 		f.ccsid = s.st_ccsid; // or st_codepage?
 		if (!set_record_length(state, &f)) {
-			return -1; // messages emited in function
+			return from_recursion ? 0 : -1; // messages emited in function
 		}
-		return do_file(state, &f);
+		matches = do_file(state, &f);
 	}
 	// XXX: Message for non-PF/members?
 	return matches;
@@ -470,7 +473,7 @@ int main(int argc, char **argv)
 	state.file_count = argc - optind;
 	bool any_match = false, any_error = false;
 	for (int i = optind; i < argc; i++) {
-		int ret = do_thing(&state, argv[i]);
+		int ret = do_thing(&state, argv[i], false);
 		if (ret > 0) {
 			any_match = true;
 		} else if (ret < 0) {
