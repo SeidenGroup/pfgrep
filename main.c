@@ -133,7 +133,7 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 			goto fail;
 		}
 	}
-	read_buf[bytes_to_read] = '\0';
+	read_buf[file->file_size] = '\0';
 
 	int64_t record_count = file->file_size / file->record_length;
 	for (int record_num = 0; record_num < record_count; record_num++) {
