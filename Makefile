@@ -17,7 +17,7 @@ CFLAGS := -std=gnu11 -Wall -Wextra -O2
 LDFLAGS := -O2
 endif
 
-VERSION := 0.1
+VERSION := 0.2
 
 # Use gcc 10 from Yum if available, otherwise try regular gcc on PATH
 CC := $(shell if type gcc-10 > /dev/null 2> /dev/null; then echo gcc-10; else echo gcc; fi)
