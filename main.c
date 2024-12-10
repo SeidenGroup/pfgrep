@@ -58,6 +58,7 @@ typedef struct pfgrep_state {
 
 typedef struct pfgrep_file {
 	const char *filename; // IFS
+	int64_t file_size;
 	int fd;
 	int record_length;
 	uint16_t ccsid;
@@ -110,29 +111,35 @@ static uint32_t get_extra_compile_flags(pfgrep *state)
 	return flags;
 }
 
-static int iter_records(pfgrep *state, const char *filename, int fd, iconv_t conv, int record_length)
+static int iter_records(pfgrep *state, File *file, iconv_t conv)
 {
-	char *read_buf = malloc(record_length + 1);
-	size_t conv_buf_size = (record_length * 6) + 1;
+	const char *filename = file->filename;
+	char *read_buf = malloc(file->file_size + 1);
+	size_t conv_buf_size = (file->record_length * 6) + 1;
 	char *conv_buf = malloc(conv_buf_size);
-	int bytes_read;
+	int bytes_to_read = file->file_size;
 	// XXX: This could use the sequence and date numbers in the PF
 	int matches = 0;
 	int line = 0;
-	while ((bytes_read = read(fd, read_buf, record_length)) != 0) {
-		if (bytes_read == -1) {
+	// Read the whole file in
+	while ((bytes_to_read = read(file->fd, read_buf, bytes_to_read)) != 0) {
+		if (bytes_to_read == -1) {
 			if (!state->silent) {
 				char msg[256 + PATH_MAX];
-				snprintf(msg, sizeof(msg), "read(%s, %d)", filename, record_length);
+				snprintf(msg, sizeof(msg), "read(%s, %d)", file->filename, bytes_to_read);
 				perror_xpf(msg);
 			}
 			matches = -1;
 			goto fail;
 		}
-		read_buf[record_length] = '\0';
-		// XXX: Check if bytes_read < record_length
-		char *in = read_buf, *out = conv_buf;
-		size_t inleft = record_length, outleft = conv_buf_size;
+	}
+	read_buf[bytes_to_read] = '\0';
+
+	int64_t record_count = file->file_size / file->record_length;
+	for (int record_num = 0; record_num < record_count; record_num++) {
+		char *record = read_buf + (record_num * file->record_length);
+		char *in = record, *out = conv_buf;
+		size_t inleft = file->record_length, outleft = conv_buf_size;
 		int rc = iconv(conv, &in, &inleft, &out, &outleft);
 		if (rc != 0) {
 			perror("iconv");
@@ -288,13 +295,12 @@ static int do_file(pfgrep *state, File *file)
 	int matches = -1;
 	iconv_t conv = (iconv_t)(-1);
 	const char *filename = file->filename;
-	int fd = -1;
 
 	// Only open after we know it's a valid thing to open.
-	fd = open(file->filename, O_RDONLY);
+	file->fd = open(file->filename, O_RDONLY);
 	// We let do_file fill in the filename and CCSID. Technically a TOCTOU
 	// problem, but open(2) error reporting with IBM i objects is goofy.
-	if (fd == -1) {
+	if (file->fd == -1) {
 		if (!state->silent) {
 			snprintf(msg, sizeof(msg), "open(%s)", filename);
 			perror_xpf(msg);
@@ -312,7 +318,7 @@ static int do_file(pfgrep *state, File *file)
 		goto fail;
 	}
 
-	matches = iter_records(state, filename, fd, conv, file->record_length);
+	matches = iter_records(state, file, conv);
 	if (matches == 0 && state->print_nonmatching_files) {
 		printf("%s\n", filename);
 	} else if (matches > 0 && state->print_matching_files) {
@@ -322,8 +328,8 @@ static int do_file(pfgrep *state, File *file)
 		printf("%s:%d\n", filename, matches);
 	}
 fail:
-	if (fd != -1) {
-		close(fd);
+	if (file->fd != -1) {
+		close(file->fd);
 	}
 	return matches;
 }
@@ -345,6 +351,7 @@ static int do_thing(pfgrep *state, const char *filename, bool from_recursion)
 		}
 		return -1;
 	}
+	f.file_size = s.st_size;
 	// objtype is *FILE or *DIR, check for mode though to avoid i.e. SAVFs
 	if (S_ISDIR(s.st_mode)) {
 		if (state->recurse) {
