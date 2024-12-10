@@ -24,7 +24,7 @@ yum install pfgrep
 ```
 
 If you don't want to install the RPM or want to work on pfgrep, follow the
-instructions below to build from
+instructions below to build from source.
 
 ## Building from source
 
