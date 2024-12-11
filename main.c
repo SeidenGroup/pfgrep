@@ -37,6 +37,7 @@ typedef struct pfgrep_state {
 	/* Pattern */
 	const char *expr;
 	pcre2_code *re;
+	bool can_jit : 1;
 	/* Options */
 	bool search_non_source_files : 1;
 	bool trim_ending_whitespace : 1;
@@ -192,7 +193,13 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 			matches = -1;
 			goto fail;
 		}
-		rc = pcre2_match(state->re, (PCRE2_SPTR)conv_buf, conv_size, offset, flags, match_data, NULL);
+		// As long as we checked that the pattern successfully was JIT
+		// compiled, it should be safe to use pcre2_jit_match instead.
+		if (state->can_jit) {
+			rc = pcre2_jit_match(state->re, (PCRE2_SPTR)conv_buf, conv_size, offset, flags, match_data, NULL);
+		} else {
+			rc = pcre2_match(state->re, (PCRE2_SPTR)conv_buf, conv_size, offset, flags, match_data, NULL);
+		}
 		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
 			if (!state->silent) {
 				PCRE2_UCHAR buffer[256];
@@ -499,6 +506,21 @@ int main(int argc, char **argv)
 		pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
 		fprintf(stderr, "Failed to compile regular expression at offset %d: %s\n", (int)erroroffset, buffer);
 		return 4;
+	}
+
+	// TODO: Decide to warn the user if JIT is disabled, or if JIT is on but
+	// the expression couldn't be compiled. For now, silently ignore errors.
+	uint32_t pcre2_can_jit = 0;
+	pcre2_config(PCRE2_CONFIG_JIT, &pcre2_can_jit);
+	if (pcre2_can_jit) {
+		size_t jit_size = 0;
+		int jit_ret = pcre2_jit_compile(state.re, PCRE2_JIT_COMPLETE);
+		if (jit_ret == 0) {
+			jit_ret = pcre2_pattern_info(state.re, PCRE2_INFO_JITSIZE, &jit_size);
+			if (jit_ret == 0 && jit_size > 0) {
+				state.can_jit = true;
+			}
+		}
 	}
 
 	state.file_count = argc - optind;
