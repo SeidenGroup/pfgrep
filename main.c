@@ -20,6 +20,7 @@
 #include </QOpenSys/usr/include/iconv.h>
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
+#include <json_c_version.h>
 #include <linkhash.h>
 
 #include "errc.h"
@@ -71,7 +72,27 @@ void free_cached_record_sizes(void);
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-cFHhiLlnpqrstwvx] EXPR files...\n", argv0);
+	fprintf(stderr, "usage: %s [-cFHhiLlnpqrstwVvx] EXPR files...\n", argv0);
+}
+
+static void version(void)
+{
+	fprintf(stderr, "pfgrep " PFGREP_VERSION "\n");
+	fprintf(stderr, "\tusing json-c %s\n", json_c_version());
+	char pcre2_ver[256], pcre2_jit[256];
+	uint32_t pcre2_can_jit = 0;
+	pcre2_config(PCRE2_CONFIG_JIT, &pcre2_can_jit);
+	pcre2_config(PCRE2_CONFIG_VERSION, pcre2_ver);
+	fprintf(stderr, "\tusing PCRE2 %s", pcre2_ver);
+	if (pcre2_can_jit) {
+		pcre2_config(PCRE2_CONFIG_JITTARGET, pcre2_jit);
+		fprintf(stderr, " (JIT target: %s)\n", pcre2_jit);
+	} else {
+		fprintf(stderr, " (no JIT)\n");
+	}
+	fprintf(stderr, "\nCopyright (c) Seiden Group 2024\n");
+	fprintf(stderr, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n");
+	fprintf(stderr, "Written by Calvin Buckley and others, see <https://github.com/SeidenGroup/pfgrep/graphs/contributors>\n");
 }
 
 static iconv_t get_iconv(uint16_t ccsid)
@@ -392,7 +413,7 @@ int main(int argc, char **argv)
 	json_global_set_string_hash(JSON_C_STR_HASH_PERLLIKE);
 
 	int ch;
-	while ((ch = getopt(argc, argv, "cFHhLlinpqrstwvx")) != -1) {
+	while ((ch = getopt(argc, argv, "cFHhLlinpqrstwVvx")) != -1) {
 		switch (ch) {
 		case 'c':
 			state.print_count = true;
@@ -441,6 +462,9 @@ int main(int argc, char **argv)
 		case 'w':
 			state.match_word = true;
 			break;
+		case 'V':
+			version();
+			return 0;
 		case 'v':
 			state.invert = true;
 			break;
