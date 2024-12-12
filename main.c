@@ -34,6 +34,11 @@ iconv_t convs[UINT16_MAX] = {0};
 typedef struct pfgrep_state {
 	/* Files */
 	int file_count;
+	/* Buffers */
+	char *read_buffer;
+	size_t read_buffer_size;
+	char *conv_buffer;
+	size_t conv_buffer_size;
 	/* Pattern */
 	const char *expr;
 	pcre2_code *re;
@@ -136,15 +141,22 @@ static uint32_t get_extra_compile_flags(pfgrep *state)
 static int iter_records(pfgrep *state, File *file, iconv_t conv)
 {
 	const char *filename = file->filename;
-	char *read_buf = malloc(file->file_size + 1);
 	size_t conv_buf_size = (file->record_length * 6) + 1;
-	char *conv_buf = malloc(conv_buf_size);
+	if (conv_buf_size > state->conv_buffer_size) {
+		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
+		state->conv_buffer_size = conv_buf_size;
+	}
+	size_t read_buf_size = file->file_size + 1;
+	if (read_buf_size > state->read_buffer_size) {
+		state->read_buffer = realloc(state->read_buffer, read_buf_size);
+		state->read_buffer_size = read_buf_size;
+	}
 	int bytes_to_read = file->file_size;
 	// XXX: This could use the sequence and date numbers in the PF
 	int matches = 0;
 	int line = 0;
 	// Read the whole file in
-	while ((bytes_to_read = read(file->fd, read_buf, bytes_to_read)) != 0) {
+	while ((bytes_to_read = read(file->fd, state->read_buffer, bytes_to_read)) != 0) {
 		if (bytes_to_read == -1) {
 			if (!state->silent) {
 				char msg[256 + PATH_MAX];
@@ -155,12 +167,12 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 			goto fail;
 		}
 	}
-	read_buf[file->file_size] = '\0';
+	state->read_buffer[file->file_size] = '\0';
 
 	int64_t record_count = file->file_size / file->record_length;
 	for (int record_num = 0; record_num < record_count; record_num++) {
-		char *record = read_buf + (record_num * file->record_length);
-		char *in = record, *out = conv_buf;
+		char *record = state->read_buffer + (record_num * file->record_length);
+		char *in = record, *out = state->conv_buffer;
 		size_t inleft = file->record_length, outleft = conv_buf_size;
 		int rc = iconv(conv, &in, &inleft, &out, &outleft);
 		if (rc != 0) {
@@ -173,12 +185,12 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 		// as SRCPFs are fixed length and space padded,
 		// so $ works like expected
 		ssize_t conv_size = conv_buf_size - outleft;
-		conv_buf[conv_size] = '\0';
+		state->conv_buffer[conv_size] = '\0';
 		if (state->trim_ending_whitespace) {
-			while (conv_size >= 0 && conv_buf[conv_size] == ' ') {
+			while (conv_size >= 0 && state->conv_buffer[conv_size] == ' ') {
 				conv_size--;
 			}
-			conv_buf[conv_size + 1] = '\0';
+			state->conv_buffer[conv_size + 1] = '\0';
 			if (conv_size == 0) {
 				continue;
 			}
@@ -196,9 +208,9 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 		// As long as we checked that the pattern successfully was JIT
 		// compiled, it should be safe to use pcre2_jit_match instead.
 		if (state->can_jit) {
-			rc = pcre2_jit_match(state->re, (PCRE2_SPTR)conv_buf, conv_size, offset, flags, match_data, NULL);
+			rc = pcre2_jit_match(state->re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, match_data, NULL);
 		} else {
-			rc = pcre2_match(state->re, (PCRE2_SPTR)conv_buf, conv_size, offset, flags, match_data, NULL);
+			rc = pcre2_match(state->re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, match_data, NULL);
 		}
 		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
 			if (!state->silent) {
@@ -220,14 +232,12 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 				if (state->print_line_numbers) {
 					printf("%d:", line);
 				}
-				printf("%s\n", conv_buf);
+				printf("%s\n", state->conv_buffer);
 			}
 		}
 		pcre2_match_data_free(match_data);
 	}
 fail:
-	free(conv_buf);
-	free(read_buf);
 	return matches;
 }
 
@@ -545,6 +555,8 @@ int main(int argc, char **argv)
 		iconv_close(conv);
 	}
 	free_cached_record_sizes();
+	free(state.read_buffer);
+	free(state.conv_buffer);
 
 	return any_error ? 2 : (any_match ? 0 : 1);
 }
