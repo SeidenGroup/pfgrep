@@ -191,10 +191,11 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 			while (conv_size >= 0 && state->conv_buffer[conv_size] == ' ') {
 				conv_size--;
 			}
-			state->conv_buffer[conv_size + 1] = '\0';
-			if (conv_size == 0) {
+			// If all whitespace, we're at -1
+			if (conv_size < 0) {
 				continue;
 			}
+			state->conv_buffer[++conv_size] = '\0';
 		}
 		// Now actually match...
 		uint32_t offset = 0, flags = 0;
