@@ -187,6 +187,7 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 		ssize_t conv_size = conv_buf_size - outleft;
 		state->conv_buffer[conv_size] = '\0';
 		if (state->trim_ending_whitespace) {
+			conv_size--; // don't start on the terminator
 			while (conv_size >= 0 && state->conv_buffer[conv_size] == ' ') {
 				conv_size--;
 			}
