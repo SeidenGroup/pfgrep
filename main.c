@@ -367,6 +367,10 @@ static int do_file(pfgrep *state, File *file)
 	if (state->print_count) {
 		printf("%s:%d\n", filename, matches);
 	}
+
+	// shift state should be reset after each file in case of MBCS/DBCS
+	iconv(conv, NULL, NULL, NULL, NULL);
+
 fail:
 	if (file->fd != -1) {
 		close(file->fd);
