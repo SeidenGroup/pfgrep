@@ -6,7 +6,7 @@ than QShell grep or using a PASE iconv/Rfile with grep in a shell script.
 
 ## Installation
 
-We provide binary builds - look in the releases for RPM packages. Packages are
+We provide binary builds - look in the [releases](https://github.com/SeidenGroup/pfgrep/releases) for `.rpm` packages. Packages are
 also provided in the Seiden Group repository for our customers.
 
 To install the RPM, copy the RPM somewhere to the IFS and run:
