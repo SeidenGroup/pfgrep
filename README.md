@@ -6,8 +6,10 @@ than QShell grep or using a PASE iconv/Rfile with grep in a shell script.
 
 ## Installation
 
-We provide binary builds - look in the [releases](https://github.com/SeidenGroup/pfgrep/releases) for `.rpm` packages. Packages are
-also provided in the Seiden Group repository for our customers.
+We provide binary builds for stable releases - look in the [releases][releases]
+for `.rpm` packages.
+
+Packages are also provided in the Seiden Group repository for our customers.
 
 To install the RPM, copy the RPM somewhere to the IFS and run:
 
@@ -23,8 +25,8 @@ If you have our repository, run:
 yum install pfgrep
 ```
 
-If you don't want to install the RPM or want to work on pfgrep, follow the
-instructions below to build from source.
+If you don't want to install the RPM, want to try features in development, or
+want to work on pfgrep, follow the instructions below to build from source.
 
 ## Building from source
 
@@ -117,3 +119,4 @@ The flags that can be passed are:
 
 [pcre2syntax]: https://www.pcre.org/current/doc/html/pcre2syntax.html
 [qsyslib-limits]: https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system
+[releases]: https://github.com/SeidenGroup/pfgrep/releases
