@@ -95,12 +95,18 @@ The first argument is a (PCRE) regular expression and all subsequent arguments
 are filenames (IFS style) of physical file members, symbolic links to members,
 or if recursion is enabled, directories/files/members that contain these.
 
+If the `-e` or `-f` flags are given, then the first argument for pattern is
+omitted, as the patterns are passed via these flags. These flags can be used
+together and multiple times.
+
 For information on PCRE regex syntax, consult [PCRE docs][pcre2syntax].
 
 The flags that can be passed are:
 
 * `-c`: Counts the matched lines in each file. Implies `-q`.
+* `-e`: Uses a pattern to match.
 * `-F`: Don't use a regular expression, match substrings literally.
+* `-f`: Reads patterns from a stream file, each on their own line. Use `-` for standard input.
 * `-H`: Always preprends the matched filename, even if only one member was passed.
 * `-h`: Never preprends the matched filename, even if only multiple members were passed.
 * `-i`: Matches are case insensitive.
