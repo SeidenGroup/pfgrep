@@ -193,10 +193,9 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 			while (conv_size >= 0 && state->conv_buffer[conv_size] == ' ') {
 				conv_size--;
 			}
-			// If all whitespace, we're at -1
-			if (conv_size < 0) {
-				continue;
-			}
+			// If all whitespace, we're at -1. It's tempting to skip,
+			// we should run matches anyways in case of i.e. `-v`,
+			// or an empty string.
 			state->conv_buffer[++conv_size] = '\0';
 		}
 		// Now actually match...
