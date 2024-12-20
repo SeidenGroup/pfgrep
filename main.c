@@ -40,8 +40,9 @@ typedef struct pfgrep_state {
 	char *conv_buffer;
 	size_t conv_buffer_size;
 	/* Pattern */
-	const char *expr;
-	pcre2_code *re;
+	json_object *patterns; // array; elements are string, userdata is pcre2_code*
+	pcre2_match_data *match_data;
+	uint32_t biggest_capture_count;
 	bool can_jit : 1;
 	/* Options */
 	bool search_non_source_files : 1;
@@ -78,7 +79,8 @@ void free_cached_record_sizes(void);
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-cFHhiLlnpqrstwVvx] EXPR files...\n", argv0);
+	fprintf(stderr, "usage: %s [-cFHhiLlnpqrstwVvx] pattern files...\n", argv0);
+	fprintf(stderr, "usage: %s [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
 }
 
 static void version(void)
@@ -199,33 +201,41 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 		}
 		// Now actually match...
 		uint32_t offset = 0, flags = 0;
-		pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(state->re, NULL);
-		if (match_data == NULL) {
-			if (!state->silent) {
-				fprintf(stderr, "failed match error: Couldn't allocate memory for match data\n");
+		// We can have multiple expressions. Find the first match.
+		size_t pattern_count = json_object_array_length(state->patterns);
+		bool matched = false;
+		for (size_t i = 0; i < pattern_count; i++) {
+			json_object *jso = json_object_array_get_idx(state->patterns, i);
+			pcre2_code *re = (pcre2_code*)json_object_get_userdata(jso);
+
+			// As long as we checked that the pattern successfully was JIT
+			// compiled, it should be safe to use pcre2_jit_match instead.
+			if (state->can_jit) {
+				rc = pcre2_jit_match(re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, state->match_data, NULL);
+			} else {
+				rc = pcre2_match(re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, state->match_data, NULL);
 			}
-			matches = -1;
-			goto fail;
+
+			if (rc > 0) {
+				matched = true;
+				break;
+			} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
+				// handle error after the loop
+				break;
+			}
 		}
-		// As long as we checked that the pattern successfully was JIT
-		// compiled, it should be safe to use pcre2_jit_match instead.
-		if (state->can_jit) {
-			rc = pcre2_jit_match(state->re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, match_data, NULL);
-		} else {
-			rc = pcre2_match(state->re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, match_data, NULL);
-		}
+
 		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
 			if (!state->silent) {
 				PCRE2_UCHAR buffer[256];
 				pcre2_get_error_message(rc, buffer, sizeof(buffer));
 				fprintf(stderr, "failed match error: %s (%d)\n", buffer, rc);
 			}
-		} else if ((rc != PCRE2_ERROR_NOMATCH && !state->invert) || (rc == PCRE2_ERROR_NOMATCH && state->invert)) {
+		} else if ((matched && !state->invert) || (!matched && state->invert)) {
 			matches++;
 			if (state->quiet && !state->print_count) {
 				// Special case: Early return since we don't
 				// to count or print more lines
-				pcre2_match_data_free(match_data);
 				goto fail;
 			} else if (!state->quiet) {
 				if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
@@ -237,7 +247,6 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 				printf("%s\n", state->conv_buffer);
 			}
 		}
-		pcre2_match_data_free(match_data);
 	}
 fail:
 	return matches;
@@ -425,9 +434,95 @@ static int do_thing(pfgrep *state, const char *filename, bool from_recursion)
 	return matches;
 }
 
+static void cleanup_pattern(json_object *jso, void *userdata)
+{
+	(void)jso;
+	pcre2_code *re = (pcre2_code*)userdata;
+	pcre2_code_free(re);
+}
+
+static bool add_pattern(pfgrep *state, const char *expr)
+{
+	int errornumber;
+	PCRE2_SIZE erroroffset;
+	pcre2_compile_context *compile_ctx = pcre2_compile_context_create(NULL);
+	pcre2_set_compile_extra_options(compile_ctx, get_extra_compile_flags(state));
+	pcre2_code *re = pcre2_compile((PCRE2_SPTR)expr,
+			PCRE2_ZERO_TERMINATED,
+			get_compile_flags(state),
+			&errornumber,
+			&erroroffset,
+			compile_ctx);
+	if (re == NULL) {
+		PCRE2_UCHAR buffer[256];
+		pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
+		fprintf(stderr, "Failed to compile regular expression \"%s\" at offset %d: %s\n",
+				expr,
+				(int)erroroffset,
+				buffer);
+		return false;
+	}
+
+	// Allocate the largest required match_data later.
+	uint32_t capture_count = 0;
+	pcre2_pattern_info(re, PCRE2_INFO_CAPTURECOUNT, &capture_count);
+	if (capture_count > state->biggest_capture_count) {
+		state->biggest_capture_count = capture_count;
+	}
+
+	// We should probably be seeing if the JIT status is usable per-expr...
+	if (state->can_jit) {
+		size_t jit_size = 0;
+		int jit_ret = pcre2_jit_compile(re, PCRE2_JIT_COMPLETE);
+		if (jit_ret == 0) {
+			jit_ret = pcre2_pattern_info(re, PCRE2_INFO_JITSIZE, &jit_size);
+			if (jit_ret != 0 || jit_size == 0) {
+				state->can_jit = false;
+			}
+		}
+	}
+
+	json_object *obj = json_object_new_string(expr);
+	json_object_set_userdata(obj, (void*)re, cleanup_pattern);
+	json_object_array_add(state->patterns, obj);
+	return true;
+}
+
+static bool add_patterns_from_file(pfgrep *state, const char *path)
+{
+	FILE *f = strcmp(path, "-") == 0 ? stdin : fopen(path, "r");
+	if (f == NULL) {
+		perror("can't open pattern file");
+		return false;
+	}
+	char *line = NULL;
+	size_t line_limit = 0;
+	ssize_t line_len;
+	bool ret = true;
+	while ((line_len = getline(&line, &line_limit, f)) > 0) {
+		// getline adds the ending newline, we don't want it
+		if (line_len > 0 && line[line_len - 1] == '\n') {
+			line[line_len - 1] = '\0';
+		}
+		if (line_len > 0 && !add_pattern(state, line)) {
+			ret = false;
+			break;
+		}
+		// getline allocated, we duped in array
+		free(line);
+		line = NULL;
+		line_limit = 0;
+	}
+	if (f != stdin) {
+		fclose(f);
+	}
+	return ret;
+}
+
 int main(int argc, char **argv)
 {
 	pfgrep state = {0};
+	state.patterns = json_object_new_array();
 
 	// The default hashing algorithm linkhash uses is fine, but since we
 	// deal with 20 character strings with few allowed characters, it
@@ -435,15 +530,31 @@ int main(int argc, char **argv)
 	// faster than the default.
 	json_global_set_string_hash(JSON_C_STR_HASH_PERLLIKE);
 
+	// TODO: Decide to warn the user if JIT is disabled, or if JIT is on but
+	// the expression couldn't be compiled. For now, silently ignore errors.
+	uint32_t can_jit = 0;
+	pcre2_config(PCRE2_CONFIG_JIT, &can_jit);
+	state.can_jit = can_jit;
+
 	int ch;
-	while ((ch = getopt(argc, argv, "cFHhLlinpqrstwVvx")) != -1) {
+	while ((ch = getopt(argc, argv, "ce:Ff:HhLlinpqrstwVvx")) != -1) {
 		switch (ch) {
 		case 'c':
 			state.print_count = true;
 			state.quiet = true; // Implied
 			break;
+		case 'e':
+			if (!add_pattern(&state, optarg)) {
+				return 4;
+			}
+			break;
 		case 'F':
 			state.fixed = true;
+			break;
+		case 'f':
+			if (!add_patterns_from_file(&state, optarg)) {
+				return 4;
+			}
 			break;
 		case 'H':
 			state.always_print_filename = true;
@@ -500,43 +611,30 @@ int main(int argc, char **argv)
 		}
 	}
 
+	// If -e nor -f were used, expect expr as first arg
+	bool need_pattern_arg = json_object_array_length(state.patterns) == 0;
+
 	// We take physical files, no stdin, so we need expr + files
-	if (optind + 1 >= argc) {
+	if (need_pattern_arg && optind + 1 >= argc) {
 		usage(argv[0]);
 		return 3;
 	}
 
-	state.expr = argv[optind++];
-	int errornumber;
-	PCRE2_SIZE erroroffset;
-	pcre2_compile_context *compile_ctx = pcre2_compile_context_create(NULL);
-	pcre2_set_compile_extra_options(compile_ctx, get_extra_compile_flags(&state));
-	state.re = pcre2_compile((PCRE2_SPTR)state.expr,
-			PCRE2_ZERO_TERMINATED,
-			get_compile_flags(&state),
-			&errornumber,
-			&erroroffset,
-			compile_ctx);
-	if (state.re == NULL) {
-		PCRE2_UCHAR buffer[256];
-		pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
-		fprintf(stderr, "Failed to compile regular expression at offset %d: %s\n", (int)erroroffset, buffer);
-		return 4;
+	if (need_pattern_arg) {
+		char *expr = strdup(argv[optind++]);
+		if (!add_pattern(&state, expr)) {
+			return 4;
+		}
 	}
 
-	// TODO: Decide to warn the user if JIT is disabled, or if JIT is on but
-	// the expression couldn't be compiled. For now, silently ignore errors.
-	uint32_t pcre2_can_jit = 0;
-	pcre2_config(PCRE2_CONFIG_JIT, &pcre2_can_jit);
-	if (pcre2_can_jit) {
-		size_t jit_size = 0;
-		int jit_ret = pcre2_jit_compile(state.re, PCRE2_JIT_COMPLETE);
-		if (jit_ret == 0) {
-			jit_ret = pcre2_pattern_info(state.re, PCRE2_INFO_JITSIZE, &jit_size);
-			if (jit_ret == 0 && jit_size > 0) {
-				state.can_jit = true;
-			}
+	// One big match data that can handle all possible;
+	// uses capture count + 1 like pcre2_match_data_create_from_pattern
+	state.match_data = pcre2_match_data_create(state.biggest_capture_count + 1, NULL);
+	if (state.match_data == NULL) {
+		if (!state.silent) {
+			fprintf(stderr, "failed match error: Couldn't allocate memory for match data\n");
 		}
+		return 6;
 	}
 
 	state.file_count = argc - optind;
@@ -553,7 +651,6 @@ int main(int argc, char **argv)
 #ifdef DEBUG
 	// This deinitialization may be unnecessary, do it for future use of
 	// sanitizers/*grind when available on i
-	pcre2_code_free(state.re);
 	for (int i = 0; i < UINT16_MAX; i++) {
 		iconv_t conv = convs[i];
 		if (conv == NULL || conv == (iconv_t)(-1)) {
@@ -561,6 +658,8 @@ int main(int argc, char **argv)
 		}
 		iconv_close(conv);
 	}
+	pcre2_match_data_free(state.match_data);
+	json_object_put(state.patterns);
 	free_cached_record_sizes();
 	free(state.read_buffer);
 	free(state.conv_buffer);
