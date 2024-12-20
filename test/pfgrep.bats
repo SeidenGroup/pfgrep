@@ -83,6 +83,16 @@ EOF
 	assert_output "FOOBAR"
 }
 
+@test "inverted match" {
+	run pfgrep -t -v 'B' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+
+	assert_output - <<EOF
+
+A
+DEF
+EOF
+}
+
 @test "case insensitivity" {
 	run pfgrep -t -i 'abc' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 	
