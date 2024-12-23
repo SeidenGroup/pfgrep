@@ -29,7 +29,7 @@ EOF
 }
 
 @test "basic fixed string" {
-	run pfgrep -t -F 'AB' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+	run pfgrep -F 'AB' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 	
 	assert_output - <<EOF
 ABC
@@ -40,7 +40,7 @@ EOF
 }
 
 @test "regular expression" {
-	run pfgrep -t '^A.C$' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+	run pfgrep '^A.C$' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 	
 	assert_output - <<EOF
 ABC
@@ -49,7 +49,7 @@ EOF
 }
 
 @test "multiple expressions" {
-	run pfgrep -t -e '^A.C$' -e "BAR$"  "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+	run pfgrep -e '^A.C$' -e "BAR$"  "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 	
 	assert_output - <<EOF
 ABC
@@ -60,7 +60,7 @@ EOF
 }
 
 @test "multiple expressions from file" {
-	run pfgrep -t -f -  "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" <<EOF
+	run pfgrep -f -  "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" <<EOF
 A.C$
 BAR$
 EOF
@@ -74,19 +74,19 @@ EOF
 }
 
 @test "word match" {
-	run pfgrep -t -w 'BAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+	run pfgrep -w 'BAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 	
 	assert_output "FOO BAR"
 }
 
 @test "line match" {
-	run pfgrep -t -x 'FOOBAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+	run pfgrep -x 'FOOBAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 	
 	assert_output "FOOBAR"
 }
 
 @test "inverted match" {
-	run pfgrep -t -v 'B' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+	run pfgrep -v 'B' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 
 	assert_output - <<EOF
 
@@ -96,7 +96,7 @@ EOF
 }
 
 @test "case insensitivity" {
-	run pfgrep -t -i 'abc' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+	run pfgrep -i 'abc' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 	
 	assert_output - <<EOF
 ABC
@@ -111,7 +111,7 @@ EOF
 }
 
 @test "forcing file names and line numbers" {
-	run pfgrep -t -H -n 'AB' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+	run pfgrep -H -n 'AB' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 	
 	assert_output - <<EOF
 /QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR:1:ABC

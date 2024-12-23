@@ -46,7 +46,7 @@ typedef struct pfgrep_state {
 	bool can_jit : 1;
 	/* Options */
 	bool search_non_source_files : 1;
-	bool trim_ending_whitespace : 1;
+	bool dont_trim_ending_whitespace : 1;
 	bool case_insensitive : 1;
 	bool always_print_filename : 1;
 	bool never_print_filename : 1;
@@ -188,7 +188,7 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 		// so $ works like expected
 		ssize_t conv_size = conv_buf_size - outleft;
 		state->conv_buffer[conv_size] = '\0';
-		if (state->trim_ending_whitespace) {
+		if (!state->dont_trim_ending_whitespace) {
 			conv_size--; // don't start on the terminator
 			while (conv_size >= 0 && state->conv_buffer[conv_size] == ' ') {
 				conv_size--;
@@ -590,7 +590,7 @@ int main(int argc, char **argv)
 			state.silent = true;
 			break;
 		case 't':
-			state.trim_ending_whitespace = true;
+			state.dont_trim_ending_whitespace = true;
 			break;
 		case 'w':
 			state.match_word = true;

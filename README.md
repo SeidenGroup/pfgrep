@@ -117,7 +117,7 @@ The flags that can be passed are:
 * `-q`: Doesn't print matches. The return code of pfgrep is unchanged though, so this is useful for i.e. conditionals in a script.
 * `-r`: Recurses into directories, be it IFS directories, libraries, or physical files.
 * `-s`: Doesn't print error messages. The return code of pfgrep is unchanged.
-* `-t`: Trims whitespace at the end of lines; by default, pfgrep doesn't, so there are spaces at the end to match record padding.
+* `-t`: Don't trim whitespace at the end of lines; by default, pfgrep does. This preserves the padding to match record length. (Older pfgrep inverted the definition of this flag.)
 * `-w`: Match only whole words.
 * `-V`: Prints the version of pfgrep and the libraries it uses, as well as copyright information.
 * `-v`: Inverts matches; lines that don't match will match and be printed et vice versa.
