@@ -57,9 +57,10 @@ size_t utf2ebcdic (const char *utf, int ebcdic_len, char *ebcdic)
 	inleft = outleft = ebcdic_len + 1;
 	char *temp;
 	temp = malloc (ebcdic_len + 1);
+	char *orig = temp;
 	sprintf (temp, "%-10s", utf);
 	ret = iconv (a2e, &temp, &inleft, &ebcdic, &outleft);
-	free (temp);
+	free (orig);
 	return ret;
 }
 
