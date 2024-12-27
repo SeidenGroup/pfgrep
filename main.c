@@ -273,6 +273,7 @@ static int match_multiline(pfgrep *state, File *file)
 		// As long as we checked that the pattern successfully was JIT
 		// compiled, it should be safe to use pcre2_jit_match instead.
 		size_t conv_size = strlen(state->conv_buffer);
+match_again:
 		if (state->can_jit) {
 			rc = pcre2_jit_match(re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, state->match_data, NULL);
 		} else {
@@ -294,17 +295,19 @@ static int match_multiline(pfgrep *state, File *file)
 		PCRE2_SIZE *match_pairs = pcre2_get_ovector_pointer(state->match_data);
 
 		for (uint32_t pair = 0; pair < match_pair_count; pair++) {
-			uint32_t offset = pair * 2;
-			size_t match_begin = (size_t)match_pairs[offset];
-			size_t match_end = (size_t)match_pairs[offset + 1];
-fprintf(stderr, "!  pair %d b %zd e %zd\n", pair, match_begin, match_end);
+			uint32_t pair_offset = pair * 2;
+			size_t match_begin = (size_t)match_pairs[pair_offset];
+			size_t match_end = (size_t)match_pairs[pair_offset + 1];
 			for (size_t line = 0; line < state->lines; line++) {
 				Line *l = &state->line_buffer[line];
-fprintf(stderr, "!   line %zd b %zd e %zd\n", line, l->begin, l->end);
 				if (match_begin >= l->begin && match_end <= l->end) {
-fprintf(stderr, "!    line matches\n");
 					l->match = true;
 					matches++;
+
+					if (match_end > offset) {
+						offset = match_end;
+						goto match_again;
+					}
 				}
 			}
 		}
@@ -326,13 +329,17 @@ fprintf(stderr, "!    line matches\n");
 		} else if (!state->quiet) {
 			for (size_t line = 0; line < state->lines; line++) {
 				Line *l = &state->line_buffer[line];
+				if (!l->match) {
+					continue;
+				}
 				if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
 					printf("%s:", file->filename);
 				}
 				if (state->print_line_numbers) {
-					printf("%zd:", line);
+					// Line buffer is 0 indexed internally
+					printf("%zd:", line + 1);
 				}
-				write(1, state->conv_buffer + l->begin, l->end - l->begin);
+				fwrite(state->conv_buffer + l->begin, l->end - l->begin, 1, stdout);
 			}
 		}
 	}
@@ -340,66 +347,66 @@ fail:
 	return matches;
 }
 
-static int match_multiline2(pfgrep *state, File *file)
+static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 {
-	int matches = 0, rc = 0;
-	uint32_t offset = 0, flags = 0;
-	// We can have multiple expressions. Find the first match.
-	size_t pattern_count = json_object_array_length(state->patterns);
-	// For each match, see if the matches intersect with a line, for
-	// printing out later.
-	for (size_t line = 0; line < state->lines; line++) {
-		Line *l = &state->line_buffer[line];
-		l->match = false;
-		for (size_t i = 0; i < pattern_count; i++) {
-			json_object *jso = json_object_array_get_idx(state->patterns, i);
-			pcre2_code *re = (pcre2_code*)json_object_get_userdata(jso);
-	
-			// As long as we checked that the pattern successfully was JIT
-			// compiled, it should be safe to use pcre2_jit_match instead.
-			PCRE2_SPTR buffer = (PCRE2_SPTR)(state->conv_buffer + l->begin);
-			size_t size = (size_t)(l->end - l->begin - 1); // exclude newline
-			if (state->can_jit) {
-				rc = pcre2_jit_match(re, buffer, size, offset, flags, state->match_data, NULL);
-			} else {
-				rc = pcre2_match(re, buffer, size, offset, flags, state->match_data, NULL);
+	size_t read_buf_size = file->file_size + 1;
+	if (read_buf_size > state->read_buffer_size) {
+		state->read_buffer = realloc(state->read_buffer, read_buf_size);
+		state->read_buffer_size = read_buf_size;
+	}
+	int bytes_to_read = file->file_size;
+	// Use this to hold a series of lines
+	// XXX: This is a abd 
+	size_t record_count = file->file_size;
+	if (record_count > state->line_buffer_size) {
+		state->line_buffer = realloc(state->line_buffer, record_count * sizeof(Line));
+		state->line_buffer_size = record_count;
+	}
+	// Assume max length plus newline character for each line
+	size_t conv_buf_size = read_buf_size + record_count;
+	if (conv_buf_size > state->conv_buffer_size) {
+		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
+		state->conv_buffer_size = conv_buf_size;
+	}
+	// Read the whole file in
+	while ((bytes_to_read = read(file->fd, state->read_buffer, bytes_to_read)) != 0) {
+		if (bytes_to_read == -1) {
+			if (!state->silent) {
+				char msg[256 + PATH_MAX];
+				snprintf(msg, sizeof(msg), "read(%s, %d)", file->filename, bytes_to_read);
+				perror_xpf(msg);
 			}
-	
-			if (rc > 0) {
-				l->match = true;
-				matches++;
-			} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
-				// handle error after the loop
-				if (!state->silent) {
-					PCRE2_UCHAR buffer[256];
-					pcre2_get_error_message(rc, buffer, sizeof(buffer));
-					fprintf(stderr, "failed match error: %s (%d)\n", buffer, rc);
-				}
-				matches = -1;
-				goto fail;
-			} else if (rc == PCRE2_ERROR_NOMATCH) {
-				continue;
-			}
-		}
-
-		if ((l->match && !state->invert) || (!l->match && state->invert)) {
-			if (state->quiet && !state->print_count) {
-				// Special case: Early return since we don't
-				// to count or print more lines
-				goto fail;
-			} else if (!state->quiet) {
-				if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
-					printf("%s:", file->filename);
-				}
-				if (state->print_line_numbers) {
-					printf("%zd:", line);
-				}
-				write(1, state->conv_buffer + l->begin, l->end - l->begin);
-			}
+			return false;
 		}
 	}
-fail:
-	return matches;
+	state->read_buffer[file->file_size] = '\0';
+
+	char *in = state->read_buffer;
+	size_t inleft = file->file_size;
+	char *out = state->conv_buffer;
+	size_t outleft = conv_buf_size;
+	int rc = iconv(conv, &in, &inleft, &out, &outleft);
+	if (rc != 0) {
+		perror("iconv");
+		return false;
+	}
+	*out++ = '\0';
+	outleft--;
+
+	// Now count lines, since we converted it all at once
+	char *begin = state->conv_buffer;
+	while (begin < out) {
+		char *end = strchr(begin, '\n');
+		if (end == NULL) {
+			break;
+		}
+		Line *l = &state->line_buffer[state->lines++];
+		l->begin = (size_t)(begin - state->conv_buffer);
+		l->end = (size_t)(end - state->conv_buffer + 1); // include newline
+		begin = end + 1;
+	}
+
+	return true;
 }
 
 static bool read_records_multiline(pfgrep *state, File *file, iconv_t conv)
@@ -587,11 +594,17 @@ static int do_file(pfgrep *state, File *file)
 		goto fail;
 	}
 
-	if (!read_records_multiline(state, file, conv)) {
-		goto fail;
+	// Streamfiles are record length 0, and must be read differently
+	if (file->record_length == 0) {
+		if (!read_streamfile(state, file, conv)) {
+			goto fail;
+		}
+		matches = match_multiline(state, file);
+	} else {
+		matches = iter_records(state, file, conv);
 	}
 
-	matches = match_multiline2(state, file);
+
 	if (matches == 0 && state->print_nonmatching_files) {
 		printf("%s\n", filename);
 	} else if (matches > 0 && state->print_matching_files) {
@@ -652,6 +665,10 @@ static int do_thing(pfgrep *state, const char *filename, bool from_recursion)
 		if (!set_record_length(state, &f)) {
 			return from_recursion ? 0 : -1; // messages emited in function
 		}
+		matches = do_file(state, &f);
+	} else if (strcmp(s.st_objtype, "*STMF     ") == 0) {
+		f.ccsid = s.st_ccsid; // or st_codepage?
+		f.record_length = 0;
 		matches = do_file(state, &f);
 	}
 	// XXX: Message for non-PF/members?

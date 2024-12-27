@@ -14,7 +14,7 @@ JSONC_LDFLAGS := $(shell pkg-config --libs json-c)
 # Build with warnings as errors and symbols for developers,
 # build with optimizations for release builds.
 ifdef DEBUG
-CFLAGS := -std=gnu11 -Wall -Wextra -Werror -g -Og -DDEBUG
+CFLAGS := -std=gnu11 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
 LDFLAGS := -g -O0
 else
 CFLAGS := -std=gnu11 -Wall -Wextra -O2
