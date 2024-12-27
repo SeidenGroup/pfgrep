@@ -151,7 +151,8 @@ static uint32_t get_extra_compile_flags(pfgrep *state)
 static int iter_records(pfgrep *state, File *file, iconv_t conv)
 {
 	const char *filename = file->filename;
-	size_t conv_buf_size = (file->record_length * 6) + 1;
+	size_t record_count = file->file_size / file->record_length;
+	size_t conv_buf_size = (file->file_size * 6) + 1;
 	if (conv_buf_size > state->conv_buffer_size) {
 		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
 		state->conv_buffer_size = conv_buf_size;
@@ -179,10 +180,12 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 	}
 	state->read_buffer[file->file_size] = '\0';
 
-	int64_t record_count = file->file_size / file->record_length;
-	for (int record_num = 0; record_num < record_count; record_num++) {
+	for (size_t record_num = 0; record_num < record_count; record_num++) {
 		char *record = state->read_buffer + (record_num * file->record_length);
-		char *in = record, *out = state->conv_buffer;
+		// Converted record is on a 6x multiplier due to possible
+		// worst case EBCDIC->UTF-8 conversion
+		char *in = record, *out = state->conv_buffer + ((file->record_length * 6) * record_num);
+		char *beginning = out;
 		size_t inleft = file->record_length, outleft = conv_buf_size;
 		int rc = iconv(conv, &in, &inleft, &out, &outleft);
 		if (rc != 0) {
@@ -194,17 +197,17 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 		// Trim buffer to end of iconv plus trim spaces,
 		// as SRCPFs are fixed length and space padded,
 		// so $ works like expected
-		ssize_t conv_size = conv_buf_size - outleft;
-		state->conv_buffer[conv_size] = '\0';
+		ssize_t conv_size = (ssize_t)(out - beginning);
+		beginning[conv_size] = '\0';
 		if (!state->dont_trim_ending_whitespace) {
-			conv_size--; // don't start on the terminator
-			while (conv_size >= 0 && state->conv_buffer[conv_size] == ' ') {
-				conv_size--;
+			for (char *ending = out - 1; ending >= beginning; ending--) {
+				if (*ending == ' ') {
+					*ending = '\0';
+					conv_size--;
+				} else {
+					break;
+				}
 			}
-			// If all whitespace, we're at -1. It's tempting to skip,
-			// we should run matches anyways in case of i.e. `-v`,
-			// or an empty string.
-			state->conv_buffer[++conv_size] = '\0';
 		}
 		// Now actually match...
 		uint32_t offset = 0, flags = 0;
@@ -218,9 +221,9 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 			// As long as we checked that the pattern successfully was JIT
 			// compiled, it should be safe to use pcre2_jit_match instead.
 			if (state->can_jit) {
-				rc = pcre2_jit_match(re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, state->match_data, NULL);
+				rc = pcre2_jit_match(re, (PCRE2_SPTR)beginning, conv_size, offset, flags, state->match_data, NULL);
 			} else {
-				rc = pcre2_match(re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, state->match_data, NULL);
+				rc = pcre2_match(re, (PCRE2_SPTR)beginning, conv_size, offset, flags, state->match_data, NULL);
 			}
 
 			if (rc > 0) {
@@ -251,7 +254,7 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 				if (state->print_line_numbers) {
 					printf("%d:", line);
 				}
-				printf("%s\n", state->conv_buffer);
+				printf("%s\n", beginning);
 			}
 		}
 	}
