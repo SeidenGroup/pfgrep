@@ -359,12 +359,14 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 	}
 	int bytes_to_read = file->file_size;
 	// Use this to hold a series of lines
-	// XXX: This is a abd 
+	// XXX: Very bad guess on how much we need...
+	// XXX: Better to just scan backwards/forwards?
 	size_t record_count = file->file_size;
 	if (record_count > state->line_buffer_size) {
 		state->line_buffer = realloc(state->line_buffer, record_count * sizeof(Line));
 		state->line_buffer_size = record_count;
 	}
+	memset(state->line_buffer, 0, record_count * sizeof(Line));
 	// Assume max length plus newline character for each line
 	size_t conv_buf_size = read_buf_size + record_count;
 	if (conv_buf_size > state->conv_buffer_size) {
