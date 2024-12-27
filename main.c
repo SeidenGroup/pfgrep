@@ -398,15 +398,24 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 
 	// Now count lines, since we converted it all at once
 	char *begin = state->conv_buffer;
+	state->lines = 0;
 	while (begin < out) {
-		char *end = strchr(begin, '\n');
+		char *end = strpbrk(begin, "\r\n");
 		if (end == NULL) {
 			break;
+		}
+		// Just coerce everything to Unix newlines (XXX: U+0085 too?)
+		size_t skip_by = 1;
+		if (*end == '\r') {
+			*end = '\n';
+			if (end[1] == '\n') {
+				skip_by++;
+			}
 		}
 		Line *l = &state->line_buffer[state->lines++];
 		l->begin = (size_t)(begin - state->conv_buffer);
 		l->end = (size_t)(end - state->conv_buffer + 1); // include newline
-		begin = end + 1;
+		begin = end + skip_by;
 	}
 
 	return true;
