@@ -31,12 +31,6 @@
 // The memory cost of this should be minimal on modern systems.
 iconv_t convs[UINT16_MAX] = {0};
 
-typedef struct line {
-	size_t begin;
-	size_t end;
-	bool match;
-} Line;
-
 typedef struct pfgrep_state {
 	/* Files */
 	int file_count;
@@ -45,8 +39,6 @@ typedef struct pfgrep_state {
 	size_t read_buffer_size;
 	char *conv_buffer;
 	size_t conv_buffer_size;
-	Line *line_buffer;
-	size_t line_buffer_size, lines;
 	/* Pattern */
 	json_object *patterns; // array; elements are string, userdata is pcre2_code*
 	pcre2_match_data *match_data;
@@ -268,83 +260,70 @@ static int match_multiline(pfgrep *state, File *file)
 	uint32_t offset = 0, flags = 0;
 	// We can have multiple expressions. Find the first match.
 	size_t pattern_count = json_object_array_length(state->patterns);
-	bool matched = false;
-	for (size_t i = 0; i < pattern_count; i++) {
-		json_object *jso = json_object_array_get_idx(state->patterns, i);
-		pcre2_code *re = (pcre2_code*)json_object_get_userdata(jso);
-
-		// As long as we checked that the pattern successfully was JIT
-		// compiled, it should be safe to use pcre2_jit_match instead.
-		size_t conv_size = strlen(state->conv_buffer);
-match_again:
-		if (state->can_jit) {
-			rc = pcre2_jit_match(re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, state->match_data, NULL);
+	int lineno = 0;
+	char *line = state->conv_buffer, *next = NULL;
+	while (line && *line) {
+		bool matched = false;
+		lineno++;
+		// Handle CRLF newlines (could be better)
+		size_t conv_size = 0;
+		next = strpbrk(line, "\r\n");
+		if (next) {
+			conv_size = (size_t)(next - line);
+			if (next[0] == '\r') {
+				next++;
+			}
+			next++;
 		} else {
-			rc = pcre2_match(re, (PCRE2_SPTR)state->conv_buffer, conv_size, offset, flags, state->match_data, NULL);
+			conv_size = strlen(line);
 		}
 
-		if (rc > 0) {
-			matched = true;
-		} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
-			// handle error after the loop
-			break;
-		} else if (rc == PCRE2_ERROR_NOMATCH) {
-			continue;
-		}
+		for (size_t i = 0; i < pattern_count; i++) {
+			json_object *jso = json_object_array_get_idx(state->patterns, i);
+			pcre2_code *re = (pcre2_code*)json_object_get_userdata(jso);
 
-		// For each match, see if the matches intersect with a line, for
-		// printing out later.
-		uint32_t match_pair_count = pcre2_get_ovector_count(state->match_data);
-		PCRE2_SIZE *match_pairs = pcre2_get_ovector_pointer(state->match_data);
+			// As long as we checked that the pattern successfully was JIT
+			// compiled, it should be safe to use pcre2_jit_match instead.
+			if (state->can_jit) {
+				rc = pcre2_jit_match(re, (PCRE2_SPTR)line, conv_size, offset, flags, state->match_data, NULL);
+			} else {
+				rc = pcre2_match(re, (PCRE2_SPTR)line, conv_size, offset, flags, state->match_data, NULL);
+			}
 
-		for (uint32_t pair = 0; pair < match_pair_count; pair++) {
-			uint32_t pair_offset = pair * 2;
-			size_t match_begin = (size_t)match_pairs[pair_offset];
-			size_t match_end = (size_t)match_pairs[pair_offset + 1];
-			for (size_t line = 0; line < state->lines; line++) {
-				Line *l = &state->line_buffer[line];
-				if (match_begin >= l->begin && match_end <= l->end) {
-					l->match = true;
-					matches++;
-
-					if (match_end > offset) {
-						offset = match_end;
-						goto match_again;
-					}
-				}
+			if (rc > 0) {
+				matched = true;
+				break;
+			} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
+				// handle error after the loop
+				break;
 			}
 		}
-	}
 
-	if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
-		if (!state->silent) {
-			PCRE2_UCHAR buffer[256];
-			pcre2_get_error_message(rc, buffer, sizeof(buffer));
-			fprintf(stderr, "failed match error: %s (%d)\n", buffer, rc);
-		}
-	} else if (matched && state->invert && 0) {
-		// Multiline inverted successful matches don't print anything.
-	} else if ((matched && !state->invert) || (!matched && state->invert)) {
-		if (state->quiet && !state->print_count) {
-			// Special case: Early return since we don't
-			// to count or print more lines
-			goto fail;
-		} else if (!state->quiet) {
-			for (size_t line = 0; line < state->lines; line++) {
-				Line *l = &state->line_buffer[line];
-				if (!l->match) {
-					continue;
-				}
+		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
+			if (!state->silent) {
+				PCRE2_UCHAR buffer[256];
+				pcre2_get_error_message(rc, buffer, sizeof(buffer));
+				fprintf(stderr, "failed match error: %s (%d)\n", buffer, rc);
+			}
+		} else if ((matched && !state->invert) || (!matched && state->invert)) {
+			matches++;
+			if (state->quiet && !state->print_count) {
+				// Special case: Early return since we don't
+				// to count or print more lines
+				goto fail;
+			} else if (!state->quiet) {
 				if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
 					printf("%s:", file->filename);
 				}
 				if (state->print_line_numbers) {
-					// Line buffer is 0 indexed internally
-					printf("%zd:", line + 1);
+					printf("%d:", lineno);
 				}
-				fwrite(state->conv_buffer + l->begin, l->end - l->begin, 1, stdout);
+				fwrite(line, conv_size, 1, stdout);
+				putchar('\n');
 			}
 		}
+
+		line = next;
 	}
 fail:
 	return matches;
@@ -358,15 +337,7 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 		state->read_buffer_size = read_buf_size;
 	}
 	int bytes_to_read = file->file_size;
-	// Use this to hold a series of lines
-	// XXX: Very bad guess on how much we need...
-	// XXX: Better to just scan backwards/forwards?
 	size_t record_count = file->file_size;
-	if (record_count > state->line_buffer_size) {
-		state->line_buffer = realloc(state->line_buffer, record_count * sizeof(Line));
-		state->line_buffer_size = record_count;
-	}
-	memset(state->line_buffer, 0, record_count * sizeof(Line));
 	// Assume max length plus newline character for each line
 	size_t conv_buf_size = read_buf_size + record_count;
 	if (conv_buf_size > state->conv_buffer_size) {
@@ -397,28 +368,6 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 	}
 	*out++ = '\0';
 	outleft--;
-
-	// Now count lines, since we converted it all at once
-	char *begin = state->conv_buffer;
-	state->lines = 0;
-	while (begin < out) {
-		char *end = strpbrk(begin, "\r\n");
-		if (end == NULL) {
-			break;
-		}
-		// Just coerce everything to Unix newlines (XXX: U+0085 too?)
-		size_t skip_by = 1;
-		if (*end == '\r') {
-			*end = '\n';
-			if (end[1] == '\n') {
-				skip_by++;
-			}
-		}
-		Line *l = &state->line_buffer[state->lines++];
-		l->begin = (size_t)(begin - state->conv_buffer);
-		l->end = (size_t)(end - state->conv_buffer + 1); // include newline
-		begin = end + skip_by;
-	}
 
 	return true;
 }
