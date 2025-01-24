@@ -25,6 +25,9 @@
 
 #include "errc.h"
 
+// In the worst case, a single byte character can become six bytes in UTF-8.
+#define UTF8_SCALE_FACTOR 6
+
 // These contain conversions from convs[N] to system PASE CCSID, memoized to
 // avoid constantly reopening iconv for conversion. Gets closed on exit.
 // Because we only convert to a single CCSID, we can keep the maping flat.
@@ -144,7 +147,7 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 {
 	const char *filename = file->filename;
 	size_t record_count = file->file_size / file->record_length;
-	size_t conv_buf_size = (file->file_size * 6) + 1;
+	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + 1;
 	if (conv_buf_size > state->conv_buffer_size) {
 		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
 		state->conv_buffer_size = conv_buf_size;
@@ -176,7 +179,7 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 		char *record = state->read_buffer + (record_num * file->record_length);
 		// Converted record is on a 6x multiplier due to possible
 		// worst case EBCDIC->UTF-8 conversion
-		char *in = record, *out = state->conv_buffer + ((file->record_length * 6) * record_num);
+		char *in = record, *out = state->conv_buffer + ((file->record_length * UTF8_SCALE_FACTOR) * record_num);
 		char *beginning = out;
 		size_t inleft = file->record_length, outleft = conv_buf_size;
 		int rc = iconv(conv, &in, &inleft, &out, &outleft);
