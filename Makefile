@@ -44,4 +44,5 @@ install: pfgrep
 
 dist:
 	# This assumes git
-	git archive --prefix=pfgrep-$(VERSION)/ --format=tar.gz -o pfgrep-$(VERSION).tar.gz HEAD Makefile README.md COPYING *.c *.h tests
+	# XXX: git archive doesn't support submodules, so for now, exclude tests with source tarballs
+	git archive --prefix=pfgrep-$(VERSION)/ --format=tar.gz -o pfgrep-$(VERSION).tar.gz HEAD Makefile README.md COPYING *.c *.h
