@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Seiden Group
+ * Copyright (c) 2024-2025 Seiden Group
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -101,7 +101,7 @@ static void version(void)
 	} else {
 		fprintf(stderr, " (no JIT)\n");
 	}
-	fprintf(stderr, "\nCopyright (c) Seiden Group 2024\n");
+	fprintf(stderr, "\nCopyright (c) Seiden Group 2024-2025\n");
 	fprintf(stderr, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n");
 	fprintf(stderr, "Written by Calvin Buckley and others, see <https://github.com/SeidenGroup/pfgrep/graphs/contributors>\n");
 }
