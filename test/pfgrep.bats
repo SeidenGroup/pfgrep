@@ -26,6 +26,17 @@ FOO BAR
 FOOBAR
 FOOBAR FOO
 EOF
+
+	TESTSTMF_A=$(mktemp /tmp/pfgrep_test.XXXXXXX)
+	export TESTSTMF_A
+	Rfile -r "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" > "$TESTSTMF_A"
+	setccsid 1208 "$TESTSTMF_A"
+
+	TESTSTMF_E=$(mktemp /tmp/pfgrep_test.XXXXXXX)
+	export TESTSTMF_E
+	Rfile -r "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" \
+		| /usr/bin/iconv -f UTF-8 -t IBM-037 > "$TESTSTMF_E"
+	setccsid 37 "$TESTSTMF_E"
 }
 
 @test "basic fixed string" {
@@ -118,6 +129,28 @@ EOF
 /QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR:2:AB
 /QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR:5:AB
 /QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR:6:ABC
+EOF
+}
+
+@test "reading EBCDIC streamfile" {
+	run pfgrep -Fn 'AB' "$TESTSTMF_E"
+
+	assert_output - <<EOF
+1:ABC
+2:AB
+5:AB
+6:ABC
+EOF
+}
+
+@test "reading UTF-8 streamfile" {
+	run pfgrep -Fn 'AB' "$TESTSTMF_A"
+
+	assert_output - <<EOF
+1:ABC
+2:AB
+5:AB
+6:ABC
 EOF
 }
 
