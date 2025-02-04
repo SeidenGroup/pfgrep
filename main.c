@@ -143,24 +143,14 @@ static uint32_t get_extra_compile_flags(pfgrep *state)
 	return flags;
 }
 
-static int iter_records(pfgrep *state, File *file, iconv_t conv)
+static bool read_records(pfgrep *state, File *file)
 {
-	const char *filename = file->filename;
-	size_t record_count = file->file_size / file->record_length;
-	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + 1;
-	if (conv_buf_size > state->conv_buffer_size) {
-		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
-		state->conv_buffer_size = conv_buf_size;
-	}
 	size_t read_buf_size = file->file_size + 1;
 	if (read_buf_size > state->read_buffer_size) {
 		state->read_buffer = realloc(state->read_buffer, read_buf_size);
 		state->read_buffer_size = read_buf_size;
 	}
 	int bytes_to_read = file->file_size;
-	// XXX: This could use the sequence and date numbers in the PF
-	int matches = 0;
-	int line = 0;
 	// Read the whole file in
 	while ((bytes_to_read = read(file->fd, state->read_buffer, bytes_to_read)) != 0) {
 		if (bytes_to_read == -1) {
@@ -169,12 +159,24 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 				snprintf(msg, sizeof(msg), "read(%s, %d)", file->filename, bytes_to_read);
 				perror_xpf(msg);
 			}
-			matches = -1;
-			goto fail;
+			return false;
 		}
 	}
 	state->read_buffer[file->file_size] = '\0';
+	return true;
+}
 
+static int match_records(pfgrep *state, File *file, iconv_t conv)
+{
+	size_t record_count = file->file_size / file->record_length;
+	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + 1;
+	if (conv_buf_size > state->conv_buffer_size) {
+		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
+		state->conv_buffer_size = conv_buf_size;
+	}
+	// XXX: This could use the sequence and date numbers in the PF
+	int matches = 0;
+	int line = 0;
 	for (size_t record_num = 0; record_num < record_count; record_num++) {
 		char *record = state->read_buffer + (record_num * file->record_length);
 		// Converted record is on a 6x multiplier due to possible
@@ -244,7 +246,7 @@ static int iter_records(pfgrep *state, File *file, iconv_t conv)
 				goto fail;
 			} else if (!state->quiet) {
 				if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
-					printf("%s:", filename);
+					printf("%s:", file->filename);
 				}
 				if (state->print_line_numbers) {
 					printf("%d:", line);
@@ -497,7 +499,10 @@ static int do_file(pfgrep *state, File *file)
 		}
 		matches = match_multiline(state, file);
 	} else {
-		matches = iter_records(state, file, conv);
+		if (!read_records(state, file)) {
+			goto fail;
+		}
+		matches = match_records(state, file, conv);
 	}
 
 
