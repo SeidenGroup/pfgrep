@@ -42,7 +42,7 @@ clean:
 	rm -f *.o pfgrep pfcat core
 
 check: pfgrep
-	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats
+	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats test/pfcat.bats
 
 install: pfgrep
 	install -D -m 755 pfgrep $(DESTDIR)$(PREFIX)/bin/pfgrep
