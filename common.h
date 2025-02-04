@@ -54,6 +54,14 @@ typedef struct pfgrep_file {
 	uint16_t ccsid;
 } File;
 
+/* this is per-tool */
+int do_action(pfgrep *state, File *file);
+
+/* common.c */
+void print_version(const char *tool_name);
+int do_thing(pfgrep *state, const char *filename, bool from_recursion);
+void free_cached_iconv(void);
+
 /* convpath.c */
 int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name);
 

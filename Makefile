@@ -29,10 +29,10 @@ LD := $(CC)
 
 all: pfgrep pfcat
 
-pfgrep: pfgrep.o errc.o ebcdic.o convpath.o rcdfmt.o
+pfgrep: pfgrep.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
 	$(LD) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
-pfcat: pfcat.o errc.o ebcdic.o convpath.o rcdfmt.o
+pfcat: pfcat.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
 	$(LD) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
