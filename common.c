@@ -21,7 +21,7 @@
 #include </QOpenSys/usr/include/iconv.h>
 #include <linkhash.h>
 
-#include "pfgrep.h"
+#include "common.h"
 #include "errc.h"
 
 void print_version(const char *tool_name)
