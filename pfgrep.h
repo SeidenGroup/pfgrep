@@ -8,6 +8,8 @@
 #define UTF8_SCALE_FACTOR 6
 
 typedef struct pfgrep_state {
+	/* Cached system info */
+	int pase_ccsid;
 	/* Files */
 	int file_count;
 	/* Buffers */

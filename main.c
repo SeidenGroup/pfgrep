@@ -166,7 +166,7 @@ static int match_multiline(pfgrep *state, File *file)
 	int lineno = 0;
 	char *line = state->conv_buffer, *next = NULL;
 	// If same CCSID, use read buffer, otherwise if EBCDIC/diff ASCII, conv
-	if (file->ccsid == Qp2paseCCSID()) {
+	if (file->ccsid == state->pase_ccsid) {
 		line = state->read_buffer;
 	}
 	while (line && *line) {
@@ -266,7 +266,7 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 
 	// Skip the copy, we'll just work against the read buffer directly.
 	// Save an unnecessary iconv and conversion.
-	if (file->ccsid == Qp2paseCCSID()) {
+	if (file->ccsid == state->pase_ccsid) {
 		state->conv_buffer[0] = '\0';
 		return true;
 	}
@@ -576,6 +576,7 @@ int main(int argc, char **argv)
 {
 	pfgrep state = {0};
 	state.patterns = json_object_new_array();
+	state.pase_ccsid = Qp2paseCCSID();
 
 	// The default hashing algorithm linkhash uses is fine, but since we
 	// deal with 20 character strings with few allowed characters, it
