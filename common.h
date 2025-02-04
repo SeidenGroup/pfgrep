@@ -4,10 +4,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
+#include <json_c_version.h>
+
 // In the worst case, a single byte character can become six bytes in UTF-8.
 #define UTF8_SCALE_FACTOR 6
 
 typedef struct pfgrep_state {
+	/* Cached system info */
+	int pase_ccsid;
 	/* Files */
 	int file_count;
 	/* Buffers */
@@ -47,6 +53,14 @@ typedef struct pfgrep_file {
 	int record_length;
 	uint16_t ccsid;
 } File;
+
+/* this is per-tool */
+int do_action(pfgrep *state, File *file);
+
+/* common.c */
+void print_version(const char *tool_name);
+int do_thing(pfgrep *state, const char *filename, bool from_recursion);
+void free_cached_iconv(void);
 
 /* convpath.c */
 int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name);
