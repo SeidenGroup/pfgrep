@@ -510,10 +510,12 @@ static int do_file(pfgrep *state, File *file)
 		printf("%s:%d\n", filename, matches);
 	}
 
-	// shift state should be reset after each file in case of MBCS/DBCS
-	iconv(conv, NULL, NULL, NULL, NULL);
-
 fail:
+	// shift state should be reset after each file in case of MBCS/DBCS
+	if (conv != (iconv_t)(-1)) {
+		iconv(conv, NULL, NULL, NULL, NULL);
+	}
+
 	if (file->fd != -1) {
 		close(file->fd);
 	}
