@@ -25,22 +25,28 @@ endif
 CC := $(shell if type gcc-10 > /dev/null 2> /dev/null; then echo gcc-10; else echo gcc; fi)
 LD := $(CC)
 
-.PHONY: clean install dist check
+.PHONY: all clean install dist check
 
-pfgrep: main.o errc.o ebcdic.o convpath.o rcdfmt.o
+all: pfgrep pfcat
+
+pfgrep: pfgrep.o errc.o ebcdic.o convpath.o rcdfmt.o
+	$(LD) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+
+pfcat: pfcat.o errc.o ebcdic.o convpath.o rcdfmt.o
 	$(LD) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
 	$(CC) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 clean:
-	rm -f *.o pfgrep core
+	rm -f *.o pfgrep pfcat core
 
 check: pfgrep
 	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats
 
 install: pfgrep
 	install -D -m 755 pfgrep $(DESTDIR)$(PREFIX)/bin/pfgrep
+	install -D -m 755 pfcat $(DESTDIR)$(PREFIX)/bin/pfcat
 
 dist:
 	# This assumes git

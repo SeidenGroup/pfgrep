@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
+#include <json_c_version.h>
+
 // In the worst case, a single byte character can become six bytes in UTF-8.
 #define UTF8_SCALE_FACTOR 6
 
