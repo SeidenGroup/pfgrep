@@ -97,7 +97,7 @@ static uint32_t get_extra_compile_flags(pfgrep *state)
 	return flags;
 }
 
-static bool read_records(pfgrep *state, File *file)
+static bool read_records(pfgrep *state, File *file, iconv_t conv)
 {
 	size_t read_buf_size = file->file_size + 1;
 	if (read_buf_size > state->read_buffer_size) {
@@ -117,100 +117,44 @@ static bool read_records(pfgrep *state, File *file)
 		}
 	}
 	state->read_buffer[file->file_size] = '\0';
-	return true;
-}
 
-static int match_records(pfgrep *state, File *file, iconv_t conv)
-{
 	size_t record_count = file->file_size / file->record_length;
-	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + 1;
+	// record length * 6 for worst case UTF-8 conv + newline
+	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + record_count + 1;
 	if (conv_buf_size > state->conv_buffer_size) {
 		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
 		state->conv_buffer_size = conv_buf_size;
 	}
-	// XXX: This could use the sequence and date numbers in the PF
-	int matches = 0;
-	int line = 0;
+	char *out = state->conv_buffer;
+	size_t outleft = conv_buf_size;
 	for (size_t record_num = 0; record_num < record_count; record_num++) {
 		char *record = state->read_buffer + (record_num * file->record_length);
 		// Converted record is on a 6x multiplier due to possible
 		// worst case EBCDIC->UTF-8 conversion
-		char *in = record, *out = state->conv_buffer + ((file->record_length * UTF8_SCALE_FACTOR) * record_num);
+		char *in = record;
 		char *beginning = out;
-		size_t inleft = file->record_length, outleft = conv_buf_size;
+		size_t inleft = file->record_length;
 		int rc = iconv(conv, &in, &inleft, &out, &outleft);
 		if (rc != 0) {
 			perror("iconv");
-			matches = -1;
-			goto fail;
+			return false;
 		}
-		line++;
 		// Trim buffer to end of iconv plus trim spaces,
 		// as SRCPFs are fixed length and space padded,
 		// so $ works like expected
-		ssize_t conv_size = (ssize_t)(out - beginning);
-		beginning[conv_size] = '\0';
 		if (!state->dont_trim_ending_whitespace) {
-			for (char *ending = out - 1; ending >= beginning; ending--) {
-				if (*ending == ' ') {
-					*ending = '\0';
-					conv_size--;
-				} else {
-					break;
-				}
+			while (out >= beginning && *(out - 1) == ' ') {
+				*out-- = '\0';
+				outleft++;
 			}
 		}
-		// Now actually match...
-		uint32_t offset = 0, flags = 0;
-		// We can have multiple expressions. Find the first match.
-		size_t pattern_count = json_object_array_length(state->patterns);
-		bool matched = false;
-		for (size_t i = 0; i < pattern_count; i++) {
-			json_object *jso = json_object_array_get_idx(state->patterns, i);
-			pcre2_code *re = (pcre2_code*)json_object_get_userdata(jso);
-
-			// As long as we checked that the pattern successfully was JIT
-			// compiled, it should be safe to use pcre2_jit_match instead.
-			if (state->can_jit) {
-				rc = pcre2_jit_match(re, (PCRE2_SPTR)beginning, conv_size, offset, flags, state->match_data, NULL);
-			} else {
-				rc = pcre2_match(re, (PCRE2_SPTR)beginning, conv_size, offset, flags, state->match_data, NULL);
-			}
-
-			if (rc > 0) {
-				matched = true;
-				break;
-			} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
-				// handle error after the loop
-				break;
-			}
-		}
-
-		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
-			if (!state->silent) {
-				PCRE2_UCHAR buffer[256];
-				pcre2_get_error_message(rc, buffer, sizeof(buffer));
-				fprintf(stderr, "failed match error: %s (%d)\n", buffer, rc);
-			}
-		} else if ((matched && !state->invert) || (!matched && state->invert)) {
-			matches++;
-			if (state->quiet && !state->print_count) {
-				// Special case: Early return since we don't
-				// to count or print more lines
-				goto fail;
-			} else if (!state->quiet) {
-				if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
-					printf("%s:", file->filename);
-				}
-				if (state->print_line_numbers) {
-					printf("%d:", line);
-				}
-				printf("%s\n", beginning);
-			}
-		}
+		*out++ = '\n';
+		outleft--;
 	}
-fail:
-	return matches;
+	*out++ = '\0';
+	outleft--;
+
+	return true;
 }
 
 static int match_multiline(pfgrep *state, File *file)
@@ -221,6 +165,10 @@ static int match_multiline(pfgrep *state, File *file)
 	size_t pattern_count = json_object_array_length(state->patterns);
 	int lineno = 0;
 	char *line = state->conv_buffer, *next = NULL;
+	// If same CCSID, use read buffer, otherwise if EBCDIC/diff ASCII, conv
+	if (file->ccsid == Qp2paseCCSID()) {
+		line = state->read_buffer;
+	}
 	while (line && *line) {
 		bool matched = false;
 		lineno++;
@@ -315,6 +263,13 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 		}
 	}
 	state->read_buffer[file->file_size] = '\0';
+
+	// Skip the copy, we'll just work against the read buffer directly.
+	// Save an unnecessary iconv and conversion.
+	if (file->ccsid == Qp2paseCCSID()) {
+		state->conv_buffer[0] = '\0';
+		return true;
+	}
 
 	char *in = state->read_buffer;
 	size_t inleft = file->file_size;
@@ -453,10 +408,10 @@ static int do_file(pfgrep *state, File *file)
 		}
 		matches = match_multiline(state, file);
 	} else {
-		if (!read_records(state, file)) {
+		if (!read_records(state, file, conv)) {
 			goto fail;
 		}
-		matches = match_records(state, file, conv);
+		matches = match_multiline(state, file);
 	}
 
 
