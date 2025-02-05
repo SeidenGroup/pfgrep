@@ -28,6 +28,7 @@ void print_version(const char *tool_name)
 {
 	fprintf(stderr, "%s " PFGREP_VERSION "\n", tool_name);
 	fprintf(stderr, "\tusing json-c %s\n", json_c_version());
+	fprintf(stderr, "\tusing libzip %s\n", zip_libzip_version());
 	char pcre2_ver[256], pcre2_jit[256];
 	uint32_t pcre2_can_jit = 0;
 	pcre2_config(PCRE2_CONFIG_JIT, &pcre2_can_jit);
@@ -347,6 +348,8 @@ int do_thing(pfgrep *state, const char *filename, bool from_recursion)
 		return -1;
 	}
 	f.file_size = s.st_size;
+	// XXX: This is 32-bit with ILE mtime
+	f.mtime = s.st_mtime;
 	// objtype is *FILE or *DIR, check for mode though to avoid i.e. SAVFs
 	if (S_ISDIR(s.st_mode)) {
 		if (state->recurse) {

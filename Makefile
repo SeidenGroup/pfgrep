@@ -10,6 +10,8 @@ PCRE2_CFLAGS := $(shell pkg-config --cflags libpcre2-8)
 PCRE2_LDFLAGS := $(shell pkg-config --libs libpcre2-8)
 JSONC_CFLAGS := $(shell pkg-config --cflags json-c)
 JSONC_LDFLAGS := $(shell pkg-config --libs json-c)
+ZIP_CFLAGS := $(shell pkg-config --cflags libzip)
+ZIP_LDFLAGS := $(shell pkg-config --libs libzip)
 
 # Build with warnings as errors and symbols for developers,
 # build with optimizations for release builds.
@@ -27,16 +29,19 @@ LD := $(CC)
 
 .PHONY: all clean install dist check
 
-all: pfgrep pfcat
+all: pfgrep pfcat pfzip
 
 pfgrep: pfgrep.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
-	$(LD) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfcat: pfcat.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
-	$(LD) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+
+pfzip: pfzip.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
-	$(CC) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+	$(CC) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(ZIP_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 clean:
 	rm -f *.o pfgrep pfcat core

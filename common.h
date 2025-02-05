@@ -7,6 +7,7 @@
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
 #include <json_c_version.h>
+#include <zip.h>
 
 // In the worst case, a single byte character can become six bytes in UTF-8.
 #define UTF8_SCALE_FACTOR 6
@@ -21,6 +22,8 @@ typedef struct pfgrep_state {
 	size_t read_buffer_size;
 	char *conv_buffer;
 	size_t conv_buffer_size;
+	/* Archive */
+	zip_t *archive;
 	/* Pattern */
 	json_object *patterns; // array; elements are string, userdata is pcre2_code*
 	pcre2_match_data *match_data;
@@ -49,6 +52,7 @@ typedef struct pfgrep_state {
 typedef struct pfgrep_file {
 	const char *filename; // IFS
 	int64_t file_size;
+	time_t mtime;
 	int fd;
 	int record_length;
 	uint16_t ccsid;
