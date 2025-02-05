@@ -37,7 +37,7 @@ pfgrep: pfgrep.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
 pfcat: pfcat.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
 	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
-pfzip: pfzip.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
+pfzip: pfzip.o common.o errc.o ebcdic.o convpath.o rcdfmt.o mbrinfo.o
 	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c

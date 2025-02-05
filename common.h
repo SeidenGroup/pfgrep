@@ -5,6 +5,7 @@
  */
 
 #define PCRE2_CODE_UNIT_WIDTH 8
+#include </QOpenSys/usr/include/iconv.h>
 #include <pcre2.h>
 #include <json_object.h>
 #include <json_c_version.h>
@@ -60,6 +61,9 @@ typedef struct pfgrep_file {
 	// EBCDIC space-padded + null terminated names for PFs
 	char libobj[21]; // object then library, QDBRTVFD needs
 	char member[11];
+	// Filled in from get_mbr_info
+	char source_type[(10 * UTF8_SCALE_FACTOR) + 1];
+	char description[(50 * UTF8_SCALE_FACTOR) + 1];
 } File;
 
 /* this is per-tool */
@@ -68,6 +72,7 @@ int do_action(pfgrep *state, File *file);
 /* common.c */
 void print_version(const char *tool_name);
 int do_thing(pfgrep *state, const char *filename, bool from_recursion);
+iconv_t get_iconv(uint16_t ccsid);
 void free_cached_iconv(void);
 
 /* convpath.c */
@@ -76,3 +81,6 @@ int filename_to_libobj(File *file);
 /* rcdfmt.c */
 int get_pf_info(File *file);
 void free_cached_record_sizes(void);
+
+/* mbrinfo.c */
+int get_mbr_info(File *file);

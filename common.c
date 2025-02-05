@@ -51,7 +51,7 @@ void print_version(const char *tool_name)
 // The memory cost of this should be minimal on modern systems.
 iconv_t convs[UINT16_MAX] = {0};
 
-static iconv_t get_iconv(uint16_t ccsid)
+iconv_t get_iconv(uint16_t ccsid)
 {
 	iconv_t conv = convs[ccsid];
 	if (conv == NULL || conv == (iconv_t)(-1)) {

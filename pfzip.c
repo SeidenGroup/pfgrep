@@ -40,6 +40,7 @@ static bool normalize_path(char *output, size_t output_size, const char *input)
 	return true;
 }
 
+bool get_member_info(File *file);
 int do_action(pfgrep *state, File *file)
 {
 	int ret = 1;
@@ -59,6 +60,7 @@ int do_action(pfgrep *state, File *file)
 		ret = -1;
 		goto fail;
 	}
+
 	char path[PATH_MAX + 1];
 	normalize_path(path, sizeof(path), file->filename);
 	zip_int64_t index = zip_file_add(state->archive, path, s, 0);
@@ -70,11 +72,19 @@ int do_action(pfgrep *state, File *file)
 		ret = -1;
 		goto fail;
 	}
-	char comment[256];
+
+	char comment[512];
+	// Put the member description as a comment.
+	// The other metdata is there too; may not be best place for it
 	if (file->record_length == 0) {
-		snprintf(comment, 256, "Original STMF CCSID %d", file->ccsid);
+		snprintf(comment, 512, "(original streamfile CCSID %d)", file->ccsid);
+	} else if (get_member_info(file) && *file->description) {
+		snprintf(comment, 512, "%s (original PF record length %d CCSID %d)",
+			file->description,
+			file->record_length,
+			file->ccsid);
 	} else {
-		snprintf(comment, 256, "Original PF Record Length %d CCSID %d",
+		snprintf(comment, 512, "(original PF record length %d CCSID %d)",
 			file->record_length,
 			file->ccsid);
 	}
