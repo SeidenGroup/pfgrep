@@ -17,6 +17,8 @@
 #include "ebcdic.h"
 #include "errc.h"
 
+#include "common.h"
+
 static ILEpointer QDBRTVFD_pgm __attribute__ ((aligned (16)));
 static int QDBRTVFD_initialized = false;
 
@@ -76,20 +78,9 @@ void free_cached_record_sizes(void)
  * positive number if source PF, as a negative number if not, and 0 if error.
  * errno is set when 0 on error is returned.
  */
-int get_pf_info(const char *lib_name, const char *obj_name)
+int get_pf_info(File *file)
 {
-	// 10 chars of object name, 10 chars of lib name, null terminator for JSON
-	char filename[21], output_filename[21];
-	memcpy(filename, obj_name, 10);
-	memcpy(filename + 10, lib_name, 10);
-	filename[20] = '\0';
-	/* Ensure filename is space and not null padded */
-	for (int i = 0; i < 20; i++) {
-		if (filename[i] == '\0') {
-			filename[i] = 0x40; /* EBCDIC ' ' */
-		}
-	}
-
+	const char *filename = file->libobj;
 	// Look at our cached records first
 	if (cached_record_sizes == NULL) {
 		cached_record_sizes = json_object_new_object();
@@ -100,6 +91,7 @@ int get_pf_info(const char *lib_name, const char *obj_name)
 	}
 
 	/* It might look at the output filename... */
+	char output_filename[21];
 	memcpy(output_filename, filename, 21);
 
 	/* XXX: Convert to using a Qdb_Qdbfh structure... */

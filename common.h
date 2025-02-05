@@ -6,6 +6,7 @@
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
+#include <json_object.h>
 #include <json_c_version.h>
 #include <zip.h>
 
@@ -56,6 +57,9 @@ typedef struct pfgrep_file {
 	int fd;
 	int record_length;
 	uint16_t ccsid;
+	// EBCDIC space-padded + null terminated names for PFs
+	char libobj[21]; // object then library, QDBRTVFD needs
+	char member[11];
 } File;
 
 /* this is per-tool */
@@ -67,8 +71,8 @@ int do_thing(pfgrep *state, const char *filename, bool from_recursion);
 void free_cached_iconv(void);
 
 /* convpath.c */
-int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name);
+int filename_to_libobj(File *file);
 
 /* rcdfmt.c */
-int get_pf_info(const char *lib_name, const char *obj_name);
+int get_pf_info(File *file);
 void free_cached_record_sizes(void);

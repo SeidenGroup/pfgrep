@@ -237,22 +237,22 @@ static bool set_record_length(pfgrep *state, File *file)
 {
 	// Determine the record length, the API to do this needs traditional paths.
 	// Note that it will resolve symlinks for us, so i.e. /QIBM/include works
-	char lib_name[29], obj_name[29], mbr_name[29];
-	const char *filename = file->filename;
-	int ret = filename_to_libobj(file->filename, lib_name, obj_name, mbr_name);
+	int ret = filename_to_libobj(file);
 	if (ret == -1) {
 		if (!state->silent) {
-			fprintf(stderr, "filename_to_libobj(%s): Failed to convert IFS path to object name\n", filename);
+			fprintf(stderr, "filename_to_libobj(%s): Failed to convert IFS path to object name\n",
+				file->filename);
 		}
 		return false;
 	}
-	int file_record_size = get_pf_info(lib_name, obj_name);
+	int file_record_size = get_pf_info(file);
 	if (file_record_size == 0 && errno == ENODEV) {
 		// Ignore files we can't support w/ POSIX I/O for now
 		return false;
 	} else if (file_record_size == 0) {
 		if (!state->silent) {
-			fprintf(stderr, "get_pf_info(%s): Couldn't get record length\n", filename);
+			fprintf(stderr, "get_pf_info(%s): Couldn't get record length\n",
+				file->filename);
 		}
 		return false;
 	} else if (file_record_size < 0 && state->search_non_source_files) {

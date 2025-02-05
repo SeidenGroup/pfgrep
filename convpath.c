@@ -14,6 +14,8 @@
 #include "ebcdic.h"
 #include "errc.h"
 
+#include "common.h"
+
 typedef struct __attribute__((packed)) Qlg_Path_Name {
 	int  CCSID;
 	char Country_ID[2];
@@ -102,13 +104,13 @@ Qp0lCvtPathToQSYSObjName (Qlg_Path_Name_T *path_name, QSYS0100 *qsys_info, const
  * Takes an ASCII IFS path to a traditional object (like /QSYS.LIB/QGPL.LIB/QCLSRC.FILE/X.MBR)
  * and breaks it down into three 29-character EBCDIC strings.
  */
-int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *mbr_name)
+int filename_to_libobj(File *file)
 {
 	struct {
 		Qlg_Path_Name_T	qlg;
 		char path[1024];
 	} input_qlg  = {0};
-	utf2ebcdic(input, 1000, input_qlg.path);
+	utf2ebcdic(file->filename, 1000, input_qlg.path);
 	// /QSYS.LIB/... path names are coerced to 37
 	input_qlg.qlg.CCSID = 37;
 	input_qlg.qlg.Path_Length = strlen(input_qlg.path);
@@ -125,12 +127,24 @@ int filename_to_libobj(const char *input, char *lib_name, char *obj_name, char *
 		return -1;
 	}
 
-	strncpy(lib_name, qsys.lib_name, 28);
-	lib_name[28] = '\0';
-	strncpy(obj_name, qsys.obj_name, 28);
-	obj_name[28] = '\0';
-	strncpy(mbr_name, qsys.mbr_name, 28);
-	mbr_name[28] = '\0';
+	memcpy(file->libobj, qsys.obj_name, 10);
+	memcpy(file->libobj + 10, qsys.lib_name, 10);
+	// Ensure filename is space and not null padded
+	for (int i = 0; i < 20; i++) {
+		if (file->libobj[i] == '\0') {
+			file->libobj[i] = 0x40; /* EBCDIC ' ' */
+		}
+	}
+	// Null terminate for json-c
+	file->libobj[20] = '\0';
+	
+	memcpy(file->member, qsys.mbr_name, 10);
+	for (int i = 0; i < 10; i++) {
+		if (file->member[i] == '\0') {
+			file->member[i] = 0x40;
+		}
+	}
+	file->member[10] = '\0';
 
 	return 0;
 }
