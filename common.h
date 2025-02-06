@@ -49,6 +49,8 @@ typedef struct pfgrep_state {
 	bool match_word : 1;
 	bool match_line : 1;
 	bool fixed : 1;
+	/* Archive options */
+	bool dont_replace_extension : 1;
 } pfgrep;
 
 typedef struct pfgrep_file {
@@ -83,4 +85,4 @@ int get_pf_info(File *file);
 void free_cached_record_sizes(void);
 
 /* mbrinfo.c */
-int get_mbr_info(File *file);
+bool get_member_info(File *file);

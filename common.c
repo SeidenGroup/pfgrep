@@ -335,7 +335,7 @@ int do_thing(pfgrep *state, const char *filename, bool from_recursion)
 	char msg[PATH_MAX + 256];
 	int matches = 0;
 	struct stat64_ILE s = {0};
-	File f;
+	File f = {0};
 
 	f.filename = filename;
 	// IBM messed up the statx declaration, it doesn't write

@@ -28,19 +28,57 @@
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-prtV] output_file.zip files\n", argv0);
+	fprintf(stderr, "usage: %s [-EprtV] output_file.zip files\n", argv0);
 }
 
-static bool normalize_path(char *output, size_t output_size, const char *input)
+static char *ends_with_mbr(const char *str)
 {
+	char *ext = strrchr(str, '.');
+	if (ext && strcasecmp("MBR", ext + 1) == 0) {
+		return ext + 1;
+	}
+	return NULL;
+}
+
+static bool is_nul_or_space(const char c)
+{
+	return c == ' ' || c == '\0';
+}
+
+/**
+ * Change the filename to be better suited to an archive. This can remove
+ * the leading / from a path to make it not absolute, and replace the file
+ * extension of a PF member to match its source type when possible.
+ */
+static void normalize_path(char *output, size_t output_size, File *file, bool replace_mbr_ext)
+{
+	// If requested, we can replace the generic .MBR suffix on a member
+	// with a file extension derived from the member's source type.
+	// XXX: Condense these checks, make case insensitive
+	if (replace_mbr_ext && !is_nul_or_space(*file->source_type)
+		&& strstr(file->filename, "/QSYS.LIB/") != NULL
+		&& ends_with_mbr(file->filename) != NULL) {
+		char new_path[PATH_MAX + 1];
+		// +1 to eliminate leading / for abs path
+		strncpy(new_path, file->filename + 1, sizeof(new_path));
+		// Copy without whitespace
+		char *extension = ends_with_mbr(new_path);
+		const char *source_type = file->source_type;
+		while (!is_nul_or_space(*source_type)) {
+			*extension++ = *source_type++;
+		}
+		*extension = '\0';
+		strncpy(output, new_path, output_size);
+		return;
+	}
+	// Otherwise, just use the path as-is, removing absoluteness.
+	const char *input = file->filename;
 	if (input[0] == '/') {
 		input++;
 	}
 	strncpy(output, input, output_size);
-	return true;
 }
 
-bool get_member_info(File *file);
 int do_action(pfgrep *state, File *file)
 {
 	int ret = 1;
@@ -62,7 +100,11 @@ int do_action(pfgrep *state, File *file)
 	}
 
 	char path[PATH_MAX + 1];
-	normalize_path(path, sizeof(path), file->filename);
+	// We'll need the member metadata for the comment and extension.
+	if (file->record_length != 0) {
+		get_member_info(file);
+	}
+	normalize_path(path, sizeof(path), file, !state->dont_replace_extension);
 	zip_int64_t index = zip_file_add(state->archive, path, s, 0);
 	if (index == -1) {
 		fprintf(stderr, "zip_file_add(%s): %s\n",
@@ -78,7 +120,7 @@ int do_action(pfgrep *state, File *file)
 	// The other metdata is there too; may not be best place for it
 	if (file->record_length == 0) {
 		snprintf(comment, 512, "(original streamfile CCSID %d)", file->ccsid);
-	} else if (get_member_info(file) && *file->description) {
+	} else if (*file->description) {
 		snprintf(comment, 512, "%s (original PF record length %d CCSID %d)",
 			file->description,
 			file->record_length,
@@ -101,8 +143,11 @@ int main(int argc, char **argv)
 	state.pase_ccsid = Qp2paseCCSID();
 
 	int ch;
-	while ((ch = getopt(argc, argv, "prtV")) != -1) {
+	while ((ch = getopt(argc, argv, "EprtV")) != -1) {
 		switch (ch) {
+		case 'E':
+			state.dont_replace_extension = true;
+			break;
 		case 'p':
 			state.search_non_source_files = true;
 			break;
