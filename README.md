@@ -1,8 +1,16 @@
-# pfgrep: grep for source physical file members
+# pfgrep: grep for source physical file members (and friends)
 
-pfgrep is a fast (with lots on the table for future optimization) way to search
+**pfgrep** is a fast (with lots possible for future optimization) way to search
 with regular expressions (using PCRE2) in physical file members. It's faster
 than QShell grep or using a PASE iconv/Rfile with grep in a shell script.
+
+pfgrep also includes other utilities useful for bridging the gap between
+physical files/EBCDIC streamfiles and the rest of the world. These include:
+
+* **pfzip**: Put PFs/streamfiles into an archive as normal UTF-8/ASCII text
+  files in a Zip file, complete with member descriptions as comments. Useful
+  combined with pfgrep to take out a bunch of relevant files for analysis.
+* **pfcat**: Read several PFs/streamfiles at once.
 
 ## Installation
 
@@ -40,7 +48,7 @@ cd pfgrep
 Install necessary dependencies:
 
 ```shell
-yum install json-c-devel pcre2-devel pkg-config make-gnu gcc
+yum install json-c-devel pcre2-devel libzip-devel pkg-config make-gnu gcc
 # Needed on IBM i 7.4 or newer, older GCC can't handle newer versions' headers
 yum install gcc-10
 ```
@@ -61,6 +69,8 @@ make install
 ```
 
 ## Examples
+
+### pfgrep
 
 Search for the string "CRASH" in case insensitive mode (including i.e. "crash")
 in a member:
@@ -89,7 +99,62 @@ pfgrep -r 'pfgrep -r '^#(define|pragma).*Qp0l.*Attr' /QSYS.LIB/QSYSINC.LIB/H.FIL
 
 Note that expansions with globs are performed by the shell, and not pfgrep.
 
+### pfzip
+
+Put the library QSYSINC into a zip file called includes.zip:
+
+```shell
+pfzip -r includes.zip /QSYS.LIB/QSYSINC.LIB
+```
+
+(The `-r` flag like for pfgrep will make it recurse into directories.)
+
+The member descriptions, record length, original CCSID before translation, and
+the source type applied to the file extension (if you don't want the new file
+extension, pass `-E`) will be in the archive. You can view it in an archiver
+utility like so:
+
+```
+Archive:  includes.zip
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+     9089  2013-10-06 12:59   QSYS.LIB/QSYSINC.LIB/ARPA.FILE/INET.C
+(original PF record length 80 CCSID 37)
+    38324  2013-10-06 13:00   QSYS.LIB/QSYSINC.LIB/ARPA.FILE/NAMESER.C
+(original PF record length 80 CCSID 37)
+     6790  2013-10-06 12:59   QSYS.LIB/QSYSINC.LIB/ARPA.FILE/REXEC.C
+REMOTE EXECUTION APIS                              (original PF record length 80 CCSID 37)
+[...]
+```
+
+You can also compose pfzip with pfgrep together. For example, you can put all
+files that match a regular expression like so:
+
+```shell
+pfzip client.zip $(pfgrep -l "(sales|exports) /QSYS.LIB/PRODLIB.LIB/Q*SRC.LIB")
+```
+
+To break this down, the `$()` takes the output of one command and turns it into
+command line arguments for another command. The `-l` flag to pfgrep will make it
+only print the files that match instead of the matching text in the files.
+
+### pfcat
+
+Print multiple files:
+
+```shell
+pfcat /QSYS.LIB/QSYSINC.LIB/H.FILE/*.MBR
+```
+
+Print everything recursively:
+
+```shell
+pfcat -r /QSYS.LIB/QSYSINC.LIB/H.FILE
+```
+
 ## Usage
+
+### pfgrep
 
 The first argument is a (PCRE) regular expression and all subsequent arguments
 are filenames (IFS style) of physical file members, symbolic links to members,
@@ -122,6 +187,32 @@ The flags that can be passed are:
 * `-V`: Prints the version of pfgrep and the libraries it uses, as well as copyright information.
 * `-v`: Inverts matches; lines that don't match will match and be printed et vice versa.
 * `-x`: Match only a whole line.
+
+### pfzip
+
+pfzip takes the Zip file to archive into as the first argument and things to put
+into said archive as the arguments after. The resulting Zip file can be extracted
+on non-IBM i systems.
+
+The flags that can be passed are:
+
+* `-E`: Don't do path translation. Currently, this includes replacing the `.MBR`
+extension of PF members with their source type (i.e. `.RPGLE`)
+* `-p`: Searches non-source physical files. Note that non-source PFs are [subject to limitations][qsyslib-limits] (pfgrep reads PFs in binary mode).
+* `-r`: Recurses into directories, be it IFS directories, libraries, or physical files.
+* `-t`: Don't trim whitespace at the end of lines; by default, pfgrep does. This preserves the padding to match record length. (Older pfgrep inverted the definition of this flag.)
+* `-V`: Prints the version of pfgrep and the libraries it uses, as well as copyright information.
+
+### pfcat
+
+pfcat takes the files to read and concentate as its arguments.
+
+The flags that can be passed are:
+
+* `-p`: Searches non-source physical files. Note that non-source PFs are [subject to limitations][qsyslib-limits] (pfgrep reads PFs in binary mode).
+* `-r`: Recurses into directories, be it IFS directories, libraries, or physical files.
+* `-t`: Don't trim whitespace at the end of lines; by default, pfgrep does. This preserves the padding to match record length. (Older pfgrep inverted the definition of this flag.)
+* `-V`: Prints the version of pfgrep and the libraries it uses, as well as copyright information.
 
 [pcre2syntax]: https://www.pcre.org/current/doc/html/pcre2syntax.html
 [qsyslib-limits]: https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system

@@ -52,6 +52,7 @@ check: pfgrep
 install: pfgrep
 	install -D -m 755 pfgrep $(DESTDIR)$(PREFIX)/bin/pfgrep
 	install -D -m 755 pfcat $(DESTDIR)$(PREFIX)/bin/pfcat
+	install -D -m 755 pfzip $(DESTDIR)$(PREFIX)/bin/pfzip
 
 dist:
 	# This assumes git
