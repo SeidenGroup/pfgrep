@@ -73,6 +73,7 @@ int do_action(pfgrep *state, File *file);
 
 /* common.c */
 void print_version(const char *tool_name);
+void common_init(pfgrep *state);
 int do_thing(pfgrep *state, const char *filename, bool from_recursion);
 iconv_t get_iconv(uint16_t ccsid);
 void free_cached_iconv(void);

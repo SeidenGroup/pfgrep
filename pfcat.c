@@ -18,9 +18,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include </QOpenSys/usr/include/iconv.h>
-#include <linkhash.h>
-
 #include "common.h"
 #include "errc.h"
 
@@ -46,7 +43,7 @@ int do_action(pfgrep *state, File *file)
 int main(int argc, char **argv)
 {
 	pfgrep state = {0};
-	state.pase_ccsid = Qp2paseCCSID();
+	common_init(&state);
 
 	int ch;
 	while ((ch = getopt(argc, argv, "prtV")) != -1) {

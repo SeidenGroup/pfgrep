@@ -223,14 +223,8 @@ static bool add_patterns_from_file(pfgrep *state, const char *path)
 int main(int argc, char **argv)
 {
 	pfgrep state = {0};
+	common_init(&state);
 	state.patterns = json_object_new_array();
-	state.pase_ccsid = Qp2paseCCSID();
-
-	// The default hashing algorithm linkhash uses is fine, but since we
-	// deal with 20 character strings with few allowed characters, it
-	// should be safe to use the simpler "Perl-like" hash, which is a bit
-	// faster than the default.
-	json_global_set_string_hash(JSON_C_STR_HASH_PERLLIKE);
 
 	// TODO: Decide to warn the user if JIT is disabled, or if JIT is on but
 	// the expression couldn't be compiled. For now, silently ignore errors.

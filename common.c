@@ -45,6 +45,17 @@ void print_version(const char *tool_name)
 	fprintf(stderr, "Written by Calvin Buckley and others, see <https://github.com/SeidenGroup/pfgrep/graphs/contributors>\n");
 }
 
+void common_init(pfgrep *state)
+{
+	// The default hashing algorithm linkhash uses is fine, but since we
+	// deal with 20 character strings with few allowed characters, it
+	// should be safe to use the simpler "Perl-like" hash, which is a bit
+	// faster than the default.
+	json_global_set_string_hash(JSON_C_STR_HASH_PERLLIKE);
+
+	state->pase_ccsid = Qp2paseCCSID();
+}
+
 // These contain conversions from convs[N] to system PASE CCSID, memoized to
 // avoid constantly reopening iconv for conversion. Gets closed on exit.
 // Because we only convert to a single CCSID, we can keep the maping flat.

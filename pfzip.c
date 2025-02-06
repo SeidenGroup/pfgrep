@@ -19,8 +19,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include </QOpenSys/usr/include/iconv.h>
-#include <linkhash.h>
 #include <zip.h>
 
 #include "common.h"
@@ -140,7 +138,7 @@ fail:
 int main(int argc, char **argv)
 {
 	pfgrep state = {0};
-	state.pase_ccsid = Qp2paseCCSID();
+	common_init(&state);
 
 	int ch;
 	while ((ch = getopt(argc, argv, "EprtV")) != -1) {
