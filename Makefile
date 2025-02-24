@@ -29,15 +29,21 @@ LD := $(CC)
 
 .PHONY: all clean install dist check
 
-all: pfgrep pfcat pfzip
+all: pfgrep pfcat pfstat pfzip
 
-pfgrep: pfgrep.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
+libpf.a: common.o errc.o ebcdic.o convpath.o rcdfmt.o mbrinfo.o
+	$(AR) -X64 cru $@ $^
+
+pfgrep: pfgrep.o libpf.a
 	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
-pfcat: pfcat.o common.o errc.o ebcdic.o convpath.o rcdfmt.o
+pfcat: pfcat.o libpf.a
 	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
-pfzip: pfzip.o common.o errc.o ebcdic.o convpath.o rcdfmt.o mbrinfo.o
+pfstat: pfstat.o libpf.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+
+pfzip: pfzip.o libpf.a
 	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
@@ -52,6 +58,7 @@ check: pfgrep pfcat pfzip
 install: pfgrep
 	install -D -m 755 pfgrep $(DESTDIR)$(PREFIX)/bin/pfgrep
 	install -D -m 755 pfcat $(DESTDIR)$(PREFIX)/bin/pfcat
+	install -D -m 755 pfstat $(DESTDIR)$(PREFIX)/bin/pfstat
 	install -D -m 755 pfzip $(DESTDIR)$(PREFIX)/bin/pfzip
 
 dist:

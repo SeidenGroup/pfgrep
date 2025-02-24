@@ -10,7 +10,12 @@ physical files/EBCDIC streamfiles and the rest of the world. These include:
 * **pfzip**: Put PFs/streamfiles into an archive as normal UTF-8/ASCII text
   files in a Zip file, complete with member descriptions as comments. Useful
   combined with pfgrep to take out a bunch of relevant files for analysis.
-* **pfcat**: Read several PFs/streamfiles at once.
+
+And some small utilities, mostly useful as examples or for diagnosing issues
+with other tools:
+
+* **pfcat**: Read several PFs/streamfiles at once. Not as featureful as Rfile.
+* **pfstat**: Print PF member information in tab-separated value (TSV) form.
 
 ## Installation
 
@@ -152,6 +157,20 @@ Print everything recursively:
 pfcat -r /QSYS.LIB/QSYSINC.LIB/H.FILE
 ```
 
+### pfstat
+
+Print multiple files:
+
+```shell
+pfstat /QSYS.LIB/QSYSINC.LIB/H.FILE/*.MBR
+```
+
+Print everything recursively:
+
+```shell
+pfstat -r /QSYS.LIB/QSYSINC.LIB/H.FILE
+```
+
 ## Usage
 
 ### pfgrep
@@ -214,6 +233,16 @@ The flags that can be passed are:
 * `-p`: Searches non-source physical files. Note that non-source PFs are [subject to limitations][qsyslib-limits] (pfgrep reads PFs in binary mode).
 * `-r`: Recurses into directories, be it IFS directories, libraries, or physical files.
 * `-t`: Don't trim whitespace at the end of lines; by default, pfgrep does. This preserves the padding to match record length. (Older pfgrep inverted the definition of this flag.)
+* `-V`: Prints the version of pfgrep and the libraries it uses, as well as copyright information.
+
+### pfstat
+
+pfstat takes the files to read and print information for as its arguments.
+
+The flags that can be passed are:
+
+* `-p`: Searches non-source physical files. Note that non-source PFs are [subject to limitations][qsyslib-limits] (pfgrep reads PFs in binary mode).
+* `-r`: Recurses into directories, be it IFS directories, libraries, or physical files.
 * `-V`: Prints the version of pfgrep and the libraries it uses, as well as copyright information.
 
 [pcre2syntax]: https://www.pcre.org/current/doc/html/pcre2syntax.html

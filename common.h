@@ -52,6 +52,8 @@ typedef struct pfgrep_state {
 	/* Archive options */
 	bool overwrite : 1;
 	bool dont_replace_extension : 1;
+	/* Stat options */
+	bool dont_read_file : 1;
 } pfgrep;
 
 typedef struct pfgrep_file {

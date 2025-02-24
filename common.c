@@ -308,14 +308,16 @@ static int do_file(pfgrep *state, File *file)
 		goto fail;
 	}
 
-	// Streamfiles are record length 0, and must be read differently
-	if (file->record_length == 0) {
-		if (!read_streamfile(state, file, conv)) {
-			goto fail;
-		}
-	} else {
-		if (!read_records(state, file, conv)) {
-			goto fail;
+	if (!state->dont_read_file) {
+		// Streamfiles are record length 0, and must be read differently
+		if (file->record_length == 0) {
+			if (!read_streamfile(state, file, conv)) {
+				goto fail;
+			}
+		} else {
+			if (!read_records(state, file, conv)) {
+				goto fail;
+			}
 		}
 	}
 	matches = do_action(state, file);
