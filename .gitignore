@@ -1,4 +1,9 @@
 *.o
+*.a
+*.zip
+*.tar.gz
 pfgrep
 pfcat
+pfzip
+pfstat
 core
