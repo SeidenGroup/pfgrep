@@ -26,7 +26,7 @@
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-EprstV] output_file.zip files\n", argv0);
+	fprintf(stderr, "usage: %s [-EprstWV] output_file.zip files\n", argv0);
 }
 
 static char *ends_with_mbr(const char *str)
@@ -150,7 +150,7 @@ int main(int argc, char **argv)
 	common_init(&state);
 
 	int ch;
-	while ((ch = getopt(argc, argv, "EprstV")) != -1) {
+	while ((ch = getopt(argc, argv, "EprstWV")) != -1) {
 		switch (ch) {
 		case 'E':
 			state.dont_replace_extension = true;
@@ -166,6 +166,9 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			state.dont_trim_ending_whitespace = true;
+			break;
+		case 'W':
+			state.overwrite = true;
 			break;
 		case 'V':
 			print_version("pfzip");
@@ -188,6 +191,10 @@ int main(int argc, char **argv)
 	}
 
 	int zerrno;
+	int open_flags = ZIP_CREATE;
+	if (state.overwrite) {
+		open_flags |= ZIP_TRUNCATE;
+	}
 	state.archive = zip_open(output_file, ZIP_CREATE, &zerrno);
 	if (state.archive == NULL && !state.silent) {
 		zip_error_t error;

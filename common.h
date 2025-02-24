@@ -50,6 +50,7 @@ typedef struct pfgrep_state {
 	bool match_line : 1;
 	bool fixed : 1;
 	/* Archive options */
+	bool overwrite : 1;
 	bool dont_replace_extension : 1;
 } pfgrep;
 

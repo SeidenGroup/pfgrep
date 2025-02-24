@@ -202,6 +202,7 @@ extension of PF members with their source type (i.e. `.RPGLE`)
 * `-r`: Recurses into directories, be it IFS directories, libraries, or physical files.
 * `-s`: Doesn't print error messages. The return code of pfzip is unchanged.
 * `-t`: Don't trim whitespace at the end of lines; by default, pfgrep does. This preserves the padding to match record length. (Older pfgrep inverted the definition of this flag.)
+* `-W`: Overwrite the contents of the Zip file. By default, it is appended to.
 * `-V`: Prints the version of pfgrep and the libraries it uses, as well as copyright information.
 
 ### pfcat
