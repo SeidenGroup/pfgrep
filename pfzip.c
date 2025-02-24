@@ -26,7 +26,7 @@
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-EprtV] output_file.zip files\n", argv0);
+	fprintf(stderr, "usage: %s [-EprstV] output_file.zip files\n", argv0);
 }
 
 static char *ends_with_mbr(const char *str)
@@ -79,7 +79,7 @@ static void normalize_path(char *output, size_t output_size, File *file, bool re
 
 int do_action(pfgrep *state, File *file)
 {
-	int ret = 1;
+	int ret = 1, nonfatal_ret;
 	const char *buf = state->conv_buffer;
 	if (file->record_length == 0 && file->ccsid == state->pase_ccsid) {
 		buf = state->read_buffer;
@@ -89,7 +89,7 @@ int do_action(pfgrep *state, File *file)
 	// therefore make a copy (NBD) and tell libzip to free (last parm)
 	char *buf_copy = strdup(buf);
 	zip_source_t *s = zip_source_buffer(state->archive, buf_copy, len, 1);
-	if (s == NULL) {
+	if (s == NULL && !state->silent) {
 		fprintf(stderr, "zip_source_buffer(%s): %s\n",
 			file->filename,
 			zip_strerror(state->archive));
@@ -104,7 +104,7 @@ int do_action(pfgrep *state, File *file)
 	}
 	normalize_path(path, sizeof(path), file, !state->dont_replace_extension);
 	zip_int64_t index = zip_file_add(state->archive, path, s, 0);
-	if (index == -1) {
+	if (index == -1 && !state->silent) {
 		fprintf(stderr, "zip_file_add(%s): %s\n",
 			file->filename,
 			zip_strerror(state->archive));
@@ -128,9 +128,18 @@ int do_action(pfgrep *state, File *file)
 			file->record_length,
 			file->ccsid);
 	}
-	// not critical
-	zip_file_set_comment(state->archive, index, comment, strlen(comment), 0);
-	zip_file_set_mtime(state->archive, index, file->mtime, 0);
+	// not critical if these fail, but do warn
+	nonfatal_ret = zip_file_set_comment(state->archive, index, comment, strlen(comment), 0);
+	if (nonfatal_ret && !state->silent) {
+		fprintf(stderr, "zip_file_set_comment: Can't set comment for %s",
+			file->filename);
+	}
+	nonfatal_ret = zip_file_set_mtime(state->archive, index, file->mtime, 0);
+	if (nonfatal_ret && !state->silent) {
+		fprintf(stderr, "zip_file_set_comment: Can't set modification time (%zd) for %s",
+			file->mtime,
+			file->filename);
+	}
 fail:
 	return ret;
 }
@@ -141,7 +150,7 @@ int main(int argc, char **argv)
 	common_init(&state);
 
 	int ch;
-	while ((ch = getopt(argc, argv, "EprtV")) != -1) {
+	while ((ch = getopt(argc, argv, "EprstV")) != -1) {
 		switch (ch) {
 		case 'E':
 			state.dont_replace_extension = true;
@@ -151,6 +160,9 @@ int main(int argc, char **argv)
 			break;
 		case 'r':
 			state.recurse = true;
+			break;
+		case 's':
+			state.silent = true;
 			break;
 		case 't':
 			state.dont_trim_ending_whitespace = true;
@@ -170,14 +182,14 @@ int main(int argc, char **argv)
 	}
 	const char *output_file = argv[optind++];
 	state.file_count = argc - optind;
-	if (state.file_count == 0) {
+	if (state.file_count == 0 && !state.silent) {
 		fprintf(stderr, "%s: need files for archive\n", argv[0]);
 		return 5;
 	}
 
 	int zerrno;
 	state.archive = zip_open(output_file, ZIP_CREATE, &zerrno);
-	if (state.archive == NULL) {
+	if (state.archive == NULL && !state.silent) {
 		zip_error_t error;
 		zip_error_init_with_code(&error, zerrno);
 		fprintf(stderr, "zip_open: %s\n",
@@ -196,7 +208,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (zip_close(state.archive) == -1) {
+	if (zip_close(state.archive) == -1 && !state.silent) {
 		fprintf(stderr, "zip_close: %s\n", zip_strerror(state.archive));
 		return 4;
 	}
