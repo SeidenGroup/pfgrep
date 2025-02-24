@@ -26,6 +26,7 @@ endif
 # Use gcc 10 from Yum if available, otherwise try regular gcc on PATH
 CC := $(shell if type gcc-10 > /dev/null 2> /dev/null; then echo gcc-10; else echo gcc; fi)
 LD := $(CC)
+AR := ar
 
 .PHONY: all clean install dist check
 
@@ -50,7 +51,7 @@ pfzip: pfzip.o libpf.a
 	$(CC) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(ZIP_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 clean:
-	rm -f *.o pfgrep pfcat core
+	rm -f *.o *.a pfgrep pfcat pfstat pfcat core
 
 check: pfgrep pfcat pfzip
 	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats test/pfcat.bats test/pfzip.bats
