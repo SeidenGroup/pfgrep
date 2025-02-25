@@ -46,8 +46,8 @@ pfzip: pfzip.o common.o errc.o ebcdic.o convpath.o rcdfmt.o mbrinfo.o
 clean:
 	rm -f *.o pfgrep pfcat core
 
-check: pfgrep
-	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats test/pfcat.bats
+check: pfgrep pfcat pfzip
+	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats test/pfcat.bats test/pfzip.bats
 
 install: pfgrep
 	install -D -m 755 pfgrep $(DESTDIR)$(PREFIX)/bin/pfgrep
