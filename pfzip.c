@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 	if (state.overwrite) {
 		open_flags |= ZIP_TRUNCATE;
 	}
-	state.archive = zip_open(output_file, ZIP_CREATE, &zerrno);
+	state.archive = zip_open(output_file, open_flags, &zerrno);
 	if (state.archive == NULL && !state.silent) {
 		zip_error_t error;
 		zip_error_init_with_code(&error, zerrno);
