@@ -79,20 +79,28 @@ bool get_member_info(File *file)
 	}
 
 	// XXX: Convert to using struct
-	char *source_type = output + 0x30;
-	ebcdic2utf(source_type, 10, file->source_type);
+	iconv_t sys_conv = get_iconv(37);
+	char *in = output + 0x30, *out = file->source_type;
+	size_t inleft = 10, outleft = sizeof(file->source_type);
+	iconv(sys_conv, &in, &inleft, &out, &outleft);
 
 	int32_t desc_ccsid = *(uint32_t*)(output + 0xF0);
-	char *out = file->description;
-	// It's not documented as such, but 65535 seems to imply an empty desc
-	if (desc_ccsid != 65535) {
-		iconv_t desc_conv = get_iconv(desc_ccsid);
-		char *desc = output + 0x54;
-		size_t inleft = 50, outleft = inleft * UTF8_SCALE_FACTOR;
-		memset(out, 0, outleft);
-		iconv(desc_conv, &desc, &inleft, &out, &outleft);
+	// 65535 is no-convert, but we want to convert, and binary descriptions
+	// should be rare. Often, it's set for no description, or things that
+	// predate ~V2R1.
+	if (desc_ccsid == 65535 || desc_ccsid == 0) {
+		desc_ccsid = Qp2jobCCSID();
 	}
-	*out = '\0';
+
+	{
+		iconv_t desc_conv = get_iconv(desc_ccsid);
+		char *in = output + 0x54, *out = file->description;
+		size_t inleft = 50, outleft = sizeof(file->description);
+		iconv(desc_conv, &in, &inleft, &out, &outleft);
+		// reset in case of shift state
+		iconv(desc_conv, NULL, NULL, NULL, NULL);
+		*out = '\0';
+	}
 
 	return true;
 }
