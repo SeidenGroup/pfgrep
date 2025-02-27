@@ -32,7 +32,7 @@ AR := ar
 
 all: pfgrep pfcat pfstat pfzip
 
-libpf.a: common.o errc.o ebcdic.o convpath.o rcdfmt.o mbrinfo.o
+libpf.a: common.o errc.o convpath.o rcdfmt.o mbrinfo.o
 	$(AR) -X64 cru $@ $^
 
 pfgrep: pfgrep.o libpf.a

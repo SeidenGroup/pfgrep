@@ -11,10 +11,8 @@
 #include <stdlib.h>
 #include <wchar.h>
 
-#include "ebcdic.h"
-#include "errc.h"
-
 #include "common.h"
+#include "errc.h"
 
 typedef struct __attribute__((packed)) Qlg_Path_Name {
 	int  CCSID;
@@ -100,6 +98,9 @@ Qp0lCvtPathToQSYSObjName (Qlg_Path_Name_T *path_name, QSYS0100 *qsys_info, const
 	}
 }
 
+// XXX: Leaks, probably should move to conv funcs...
+static iconv_t a2e = NULL;
+
 /**
  * Takes an ASCII IFS path to a traditional object (like /QSYS.LIB/QGPL.LIB/QCLSRC.FILE/X.MBR)
  * and breaks it down into three 29-character EBCDIC strings.
@@ -110,7 +111,14 @@ int filename_to_libobj(File *file)
 		Qlg_Path_Name_T	qlg;
 		char path[1024];
 	} input_qlg  = {0};
-	utf2ebcdic(file->filename, 1000, input_qlg.path);
+
+	if (a2e == NULL) {
+		a2e = iconv_open(ccsidtocs(37), ccsidtocs(Qp2paseCCSID()));
+	}
+	char *in = (char*)file->filename, *out = input_qlg.path;
+	size_t inleft = strlen(file->filename), outleft = 1024;
+	iconv(a2e, &in, &inleft, &out, &outleft);
+
 	// /QSYS.LIB/... path names are coerced to 37
 	input_qlg.qlg.CCSID = 37;
 	input_qlg.qlg.Path_Length = strlen(input_qlg.path);

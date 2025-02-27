@@ -14,7 +14,6 @@
 
 #include <json_object.h>
 
-#include "ebcdic.h"
 #include "errc.h"
 
 #include <fcntl.h>
