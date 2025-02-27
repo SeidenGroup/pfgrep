@@ -98,9 +98,6 @@ Qp0lCvtPathToQSYSObjName (Qlg_Path_Name_T *path_name, QSYS0100 *qsys_info, const
 	}
 }
 
-// XXX: Leaks, probably should move to conv funcs...
-static iconv_t a2e = NULL;
-
 /**
  * Takes an ASCII IFS path to a traditional object (like /QSYS.LIB/QGPL.LIB/QCLSRC.FILE/X.MBR)
  * and breaks it down into three 29-character EBCDIC strings.
@@ -112,9 +109,7 @@ int filename_to_libobj(File *file)
 		char path[1024];
 	} input_qlg  = {0};
 
-	if (a2e == NULL) {
-		a2e = iconv_open(ccsidtocs(37), ccsidtocs(Qp2paseCCSID()));
-	}
+	iconv_t a2e = get_pase_to_system_iconv();
 	char *in = (char*)file->filename, *out = input_qlg.path;
 	size_t inleft = strlen(file->filename), outleft = 1024;
 	iconv(a2e, &in, &inleft, &out, &outleft);

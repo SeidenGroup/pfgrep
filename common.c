@@ -56,32 +56,6 @@ void common_init(pfgrep *state)
 	state->pase_ccsid = Qp2paseCCSID();
 }
 
-// These contain conversions from convs[N] to system PASE CCSID, memoized to
-// avoid constantly reopening iconv for conversion. Gets closed on exit.
-// Because we only convert to a single CCSID, we can keep the maping flat.
-// The memory cost of this should be minimal on modern systems.
-iconv_t convs[UINT16_MAX] = {0};
-
-iconv_t get_iconv(uint16_t ccsid)
-{
-	iconv_t conv = convs[ccsid];
-	if (conv == NULL || conv == (iconv_t)(-1)) {
-		conv = iconv_open(ccsidtocs(Qp2paseCCSID()), ccsidtocs(ccsid));
-		convs[ccsid] = conv;
-	}
-	return conv;
-}
-
-void free_cached_iconv(void)
-{
-	for (int i = 0; i < UINT16_MAX; i++) {
-		iconv_t conv = convs[i];
-		if (conv == NULL || conv == (iconv_t)(-1)) {
-			continue;
-		}
-		iconv_close(conv);
-	}
-}
 
 static bool read_records(pfgrep *state, File *file, iconv_t conv)
 {

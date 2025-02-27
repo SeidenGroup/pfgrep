@@ -78,6 +78,9 @@ int do_action(pfgrep *state, File *file);
 void print_version(const char *tool_name);
 void common_init(pfgrep *state);
 int do_thing(pfgrep *state, const char *filename, bool from_recursion);
+
+/* conv.c */
+iconv_t get_pase_to_system_iconv(void);
 iconv_t get_iconv(uint16_t ccsid);
 void free_cached_iconv(void);
 
