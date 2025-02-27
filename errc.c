@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <os400msg.h>
 
-#include "ebcdic.h"
+#include "common.h"
 #include "errc.h"
 
 static bool
@@ -38,7 +38,10 @@ get_xpf_exception (char msg[8])
 		return false; // No message
 	}
 
-	ebcdic2utf(msg_info.Message_Id, 7, msg);
+	iconv_t sys_conv = get_iconv(37);
+	char *in = msg_info.Message_Id, *out = msg;
+	size_t inleft = 7, outleft = 8;
+	iconv(sys_conv, &in, &inleft, &out, &outleft);
 	msg[7] = '\0';
 	return true;
 }
