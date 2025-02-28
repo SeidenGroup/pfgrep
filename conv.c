@@ -48,3 +48,11 @@ void free_cached_iconv(void)
 	}
 	iconv_close(pase_to_system_iconv);
 }
+
+/**
+ * Resets iconv shift state for MBCS encodings.
+ */
+void reset_iconv(iconv_t conv)
+{
+	iconv(conv, NULL, NULL, NULL, NULL);
+}

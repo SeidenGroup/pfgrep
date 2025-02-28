@@ -97,7 +97,7 @@ bool get_member_info(File *file)
 		size_t inleft = 50, outleft = sizeof(file->description);
 		iconv(desc_conv, &in, &inleft, &out, &outleft);
 		// reset in case of shift state
-		iconv(desc_conv, NULL, NULL, NULL, NULL);
+		reset_iconv(desc_conv);
 		*out = '\0';
 	}
 

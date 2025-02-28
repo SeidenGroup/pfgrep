@@ -308,7 +308,7 @@ static int do_file(pfgrep *state, File *file)
 fail:
 	// shift state should be reset after each file in case of MBCS/DBCS
 	if (conv != (iconv_t)(-1)) {
-		iconv(conv, NULL, NULL, NULL, NULL);
+		reset_iconv(conv);
 	}
 
 	if (file->fd != -1) {

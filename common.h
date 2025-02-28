@@ -83,6 +83,7 @@ int do_thing(pfgrep *state, const char *filename, bool from_recursion);
 iconv_t get_pase_to_system_iconv(void);
 iconv_t get_iconv(uint16_t ccsid);
 void free_cached_iconv(void);
+void reset_iconv(iconv_t conv);
 
 /* convpath.c */
 int filename_to_libobj(File *file);
