@@ -1,0 +1,99 @@
+.Dd Feb 28, 2025
+.Dt PFZIP 1
+.Os
+.Sh NAME
+.Nm pfzip
+.Nd archive physical files and streamfiles
+.Sh SYNOPSYS
+.Nm
+.Op Fl EprstWV
+.Ar zip-file
+.Ar files
+.Sh DESCRIPTION
+The
+.Nm
+utility creates a Zip format archive specified in the
+.Ar zip-file
+argument, containing the physical file members or IFS streamfiles as specified in the
+.Ar files
+argument. The files inside will be converted to the PASE locale, and for physical
+file members, have Unix line endings. The file extension of a physical file
+ member will also be changed to match its source type, for example, "RPGLE". The
+Zip archive will also have comments for each file that match the physical file
+members' text descriptions.
+.Pp
+The options are as follows:
+.Bl -tag -width indent
+.It Fl E
+Don't translate the path of physical file members in the archive.
+.It Fl p
+Searches non-source physical files. Note that non-source physical files are
+subject to
+.Lk https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system some limitations
+as they are read in POSIX binary mode.
+.It Fl r
+Recurses into IFS directories, libraries, and physical files.
+.It Fl s
+Don't print error messages; the return code is unchanged.
+.It Fl t
+Don't trim whitespace at the end of lines; by default, whitespace is trimmed.
+This preserves the padding to match the length of the record.
+.It Fl W
+Overwrite the archive if it exists already.
+.It Fl V
+Print the version number of the utility and any libraries it uses.
+.El
+.Sh EXAMPLES
+Put the library QSYSINC into a zip file called includes.zip:
+.Pp
+.Dl pfzip -r includes.zip /QSYS.LIB/QSYSINC.LIB
+.Pp
+Note that the
+.Fl r
+flag like for pfgrep will make it recurse into directories.
+.Pp
+The member descriptions, record length, original CCSID before translation, and
+the source type applied to the file extension (if you don't want the new file
+extension, pass the
+.Fl E
+flag) will be in the archive. You can view it in an archiver utility like
+.Xr unzip 1
+and see the descriptions like so:
+.Bd -literal
+Archive:  includes.zip
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+     9089  2013-10-06 12:59   QSYS.LIB/QSYSINC.LIB/ARPA.FILE/INET.C
+(original PF record length 80 CCSID 37)
+    38324  2013-10-06 13:00   QSYS.LIB/QSYSINC.LIB/ARPA.FILE/NAMESER.C
+(original PF record length 80 CCSID 37)
+     6790  2013-10-06 12:59   QSYS.LIB/QSYSINC.LIB/ARPA.FILE/REXEC.C
+REMOTE EXECUTION APIS                              (original PF record length 80 CCSID 37)
+[...]
+.Ed
+.Pp
+You can also compose pfzip with pfgrep together. For example, you can put all
+files that match a regular expression like so:
+.Pp
+.Dl pfzip client.zip $(pfgrep -l Qo (sales|exports) Qc /QSYS.LIB/PRODLIB.LIB/Q*SRC.LIB)
+.Pp
+To break this down, the
+.Ql $()
+shell construct takes the output of one command and turns it into command line
+arguments for another command. The
+.Fl l
+flag to pfgrep will make it only print the files that match instead of the
+matching text in the files.
+.Sh SEE ALSO
+.Xr pfcat 1 ,
+.Xr pfgrep 1 ,
+.Xr pfstat 1 ,
+.Xr libzip 3 ,
+.Xr unzip 1
+.Sh AUTHORS
+The
+.Nm
+utility was written for Seiden Group by
+.An Calvin Buckley Aq Mt calvin@seidengroup.com
+and
+.Lk https://github.com/SeidenGroup/pfgrep/graphs/contributors other contributors .

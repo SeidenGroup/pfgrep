@@ -1,0 +1,128 @@
+.Dd Feb 28, 2025
+.Dt PFGREP 1
+.Os
+.Sh NAME
+.Nm pfgrep
+.Nd search physical files and streamfiles for regular expressions
+.Sh SYNOPSYS
+.Nm
+.Op Fl e Ar expression
+.Op Fl f Ar expression-file
+.Op Fl ceFHhiLlnpqrstwVvx
+.Op Ar expression
+.Ar files
+.Sh DESCRIPTION
+The
+.Nm
+utility looks for a regular expression, as specified with the
+.Fl ef
+flags or the
+.Ar expression
+argument, in the physical file members or IFS streamfiles as specified in the
+.Ar files
+argument. If the any of the
+.Fl ef
+flags are specified, then the first
+.Ar expression
+argument must be omitted. Filenames for non-IFS streamfiles must be given with
+the QSYS syntax, i.e.
+.Pa /QSYS.LIB/LIBRARY.LIB/FILE.FILE/MEMBER.MBR .
+.Pp
+The PCRE2 regular expression engine is used; the syntax is specified in the
+.Xr pcresyntax 3
+manual page.
+.Pp
+The options are as follows:
+.Bl -tag -width indent
+.It Fl c
+Counts the matched lines in each file. Implies the
+.Fl q
+flag.
+.It Fl e Ar expression
+Match the expression specified by the argument. Multiple of these can be passed,
+and in combination with the
+.Fl f
+flag.
+.It Fl F
+Don't use regular expression matching; match substrings literally instead.
+.It Fl f Ar expression-file
+Match the expressions specified in the file. Multiple of these can be passed, and
+in combination with the
+.Fl e
+flag.
+.It Fl H
+Always preprends the matched filename, even if only one member was passed.
+.It Fl h
+Never preprends the matched filename, even if only multiple members were passed.
+.It Fl i
+Matches are case sensitive.
+.It Fl L
+Shows filenames that didn't match. Implies the
+.Fl q
+flag.
+.It Fl l
+Shows filenames that did match. Implies the
+.Fl q
+flag.
+.It Fl n
+Shows the line number of a match. Note that this is not the sequence number of a
+record for a physical file member.
+.It Fl p
+Searches non-source physical files. Note that non-source physical files are
+subject to
+.Lk https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system some limitations
+as they are read in POSIX binary mode.
+.It Fl q
+Don't print matches; the return code is unmatched. This is useful for i.e. script
+conditions.
+.It Fl r
+Recurses into IFS directories, libraries, and physical files.
+.It Fl s
+Don't print error messages; the return code is unchanged.
+.It Fl t
+Don't trim whitespace at the end of lines; by default, whitespace is trimmed.
+This preserves the padding to match the length of the record.
+.It Fl w
+Match only whole words.
+.It Fl V
+Print the version number of the utility and any libraries it uses.
+.It Fl v
+Inverts matches. Lines that don't match will instead et vice versa.
+.It Fl x
+Match only a whole line.
+.El
+.Sh EXIT STATUS
+.Nm
+returns 0 for any matches, 1 for no match, and any other exit status for errors.
+.Sh EXAMPLES
+Search for the string "CRASH" in case insensitive mode (including i.e. "crash")
+in a member:
+.Pp
+.Dl pfgrep -i crash /QSYS.LIB/CALVIN.LIB/QCLSRC.FILE/LOOP.MBR
+.Pp
+Search for VxRx references in the ILE C header files:
+.Pp
+.Dl pfgrep '[Vv][0-9][Rr][0-9]' /QIBM/include/*.h
+.Pp
+Search for the word "function" recursively in several libraries and files:
+.Pp
+.Dl pfgrep -w -r 'function' /QSYS.LIB/PROD.LIB /QSYS.LIB/DEV.LIB /QSYS.LIB/ALICE.LIB/ROBERT.FILE
+.Pp
+Search recursively with a regular expression:
+.Pp
+.Dl pfgrep -r 'pfgrep -r '^#(define|pragma).*Qp0l.*Attr' /QSYS.LIB/QSYSINC.LIB/H.FILE
+.Pp
+Note that expansions with globs are performed by the shell, and not pfgrep.
+.Sh SEE ALSO
+.Xr pfcat 1 ,
+.Xr pfstat 1 ,
+.Xr pfzip 1 ,
+.Xr pcresyntax 3 ,
+.Xr grep 1
+.Sh AUTHORS
+The
+.Nm
+utility was written for Seiden Group by
+.An Calvin Buckley Aq Mt calvin@seidengroup.com
+and
+.Lk https://github.com/SeidenGroup/pfgrep/graphs/contributors other contributors .

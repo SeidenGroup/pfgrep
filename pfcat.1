@@ -1,0 +1,58 @@
+.Dd Feb 28, 2025
+.Dt PFCAT 1
+.Os
+.Sh NAME
+.Nm pfcat
+.Nd print physical files and streamfiles
+.Sh SYNOPSYS
+.Nm
+.Op Fl prtV
+.Ar files
+.Sh DESCRIPTION
+The
+.Nm
+prints the physical file members or IFS streamfiles as specified in the
+.Ar files
+argument. Filenames for non-IFS streamfiles must be given with the QSYS syntax, i.e.
+.Pa /QSYS.LIB/LIBRARY.LIB/FILE.FILE/MEMBER.MBR .
+.Pp
+.Nm
+is mostly interesting as an example of using pfgrep code, and for easily viewing
+EBCDIC streamfiles; for physical files, most users are better off using Rfile.
+.Pp
+The options are as follows:
+.Bl -tag -width indent
+.It Fl p
+Searches non-source physical files. Note that non-source physical files are
+subject to
+.Lk https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system some limitations
+as they are read in POSIX binary mode.
+.It Fl r
+Recurses into IFS directories, libraries, and physical files.
+.It Fl t
+Don't trim whitespace at the end of lines; by default, whitespace is trimmed.
+This preserves the padding to match the length of the record.
+.It Fl V
+Print the version number of the utility and any libraries it uses.
+.El
+.Sh EXAMPLES
+Print multiple files:
+.Pp
+.Dl pfcat /QSYS.LIB/QSYSINC.LIB/H.FILE/*.MBR
+.Pp
+Print everything recursively:
+.Pp
+.Dl pfcat -r /QSYS.LIB/QSYSINC.LIB/H.FILE
+.Pp
+.Sh SEE ALSO
+.Xr pfgrep 1 ,
+.Xr pfstat 1 ,
+.Xr pfzip 1 ,
+.Lk https://www.ibm.com/docs/en/i/7.5?topic=directories-rfile Rfile
+.Sh AUTHORS
+The
+.Nm
+utility was written for Seiden Group by
+.An Calvin Buckley Aq Mt calvin@seidengroup.com
+and
+.Lk https://github.com/SeidenGroup/pfgrep/graphs/contributors other contributors .

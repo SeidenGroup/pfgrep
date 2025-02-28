@@ -1,0 +1,57 @@
+.Dd Feb 28, 2025
+.Dt PFSTAT 1
+.Os
+.Sh NAME
+.Nm pfcat
+.Nd print physical file information
+.Sh SYNOPSYS
+.Nm
+.Op Fl prV
+.Ar files
+.Sh DESCRIPTION
+The
+.Nm
+prints metadata about the physical file members as specified in the
+.Ar files
+argument. Filenames for non-IFS streamfiles must be given with the QSYS syntax, i.e.
+.Pa /QSYS.LIB/LIBRARY.LIB/FILE.FILE/MEMBER.MBR .
+.Pp
+.Nm
+outputs its data in a tab-separated values format. It is mostly useful for debugging
+issues in pfgrep code, but can be used to i.e. make a manifest of a library.
+Currently, the filename, size in bytes, source type, record length, CCSID, and
+the text description are printed.
+.Pp
+The options are as follows:
+.Bl -tag -width indent
+.It Fl p
+Searches non-source physical files. Note that non-source physical files are
+subject to
+.Lk https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system some limitations
+as they are read in POSIX binary mode.
+.It Fl r
+Recurses into IFS directories, libraries, and physical files.
+.It Fl V
+Print the version number of the utility and any libraries it uses.
+.El
+.Sh EXAMPLES
+Print multiple files:
+.Pp
+.Dl pfstat /QSYS.LIB/QSYSINC.LIB/H.FILE/*.MBR
+.Pp
+Print everything recursively:
+.Pp
+.Dl pfstat -r /QSYS.LIB/QSYSINC.LIB/H.FILE
+.Pp
+.Sh SEE ALSO
+.Xr pfcat 1 ,
+.Xr pfgrep 1 ,
+.Xr pfzip 1 ,
+.Xr stat 1
+.Sh AUTHORS
+The
+.Nm
+utility was written for Seiden Group by
+.An Calvin Buckley Aq Mt calvin@seidengroup.com
+and
+.Lk https://github.com/SeidenGroup/pfgrep/graphs/contributors other contributors .

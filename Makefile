@@ -56,13 +56,17 @@ clean:
 check: pfgrep pfcat pfzip
 	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats test/pfcat.bats test/pfzip.bats
 
-install: pfgrep
+install: all
 	install -D -m 755 pfgrep $(DESTDIR)$(PREFIX)/bin/pfgrep
 	install -D -m 755 pfcat $(DESTDIR)$(PREFIX)/bin/pfcat
 	install -D -m 755 pfstat $(DESTDIR)$(PREFIX)/bin/pfstat
 	install -D -m 755 pfzip $(DESTDIR)$(PREFIX)/bin/pfzip
+	install -D -m 644 pfgrep.1 $(DESTDIR)$(PREFIX)/share/man/man1/pfgrep.1
+	install -D -m 644 pfcat.1 $(DESTDIR)$(PREFIX)/share/man/man1/pfcat.1
+	install -D -m 644 pfstat.1 $(DESTDIR)$(PREFIX)/share/man/man1/pfstat.1
+	install -D -m 644 pfzip.1 $(DESTDIR)$(PREFIX)/share/man/man1/pfzip.1
 
 dist:
 	# This assumes git
 	# XXX: git archive doesn't support submodules, so for now, exclude tests with source tarballs
-	git archive --prefix=pfgrep-$(VERSION)/ --format=tar.gz -o pfgrep-$(VERSION).tar.gz HEAD Makefile README.md COPYING *.c *.h
+	git archive --prefix=pfgrep-$(VERSION)/ --format=tar.gz -o pfgrep-$(VERSION).tar.gz HEAD Makefile README.md COPYING *.c *.h *.1
