@@ -132,6 +132,22 @@ EOF
 EOF
 }
 
+@test "context lines after" {
+	run pfgrep -A 3 -n 'B[AC]' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+
+	assert_output - <<EOF
+1:ABC
+2:AB
+3:
+4:A
+6:ABC
+7:DEF
+8:FOO BAR
+9:FOOBAR
+10:FOOBAR FOO
+EOF
+}
+
 @test "reading EBCDIC streamfile" {
 	run pfgrep -Fn 'AB' "$TESTSTMF_E"
 

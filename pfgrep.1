@@ -8,6 +8,7 @@
 .Nm
 .Op Fl e Ar expression
 .Op Fl f Ar expression-file
+.Op Fl A Ar num
 .Op Fl ceFHhiLlnpqrstwVvx
 .Op Ar expression
 .Ar files
@@ -34,6 +35,10 @@ manual page.
 .Pp
 The options are as follows:
 .Bl -tag -width indent
+.It Fl A Ar num
+Prints the number of lines as specified by
+.Ar num ,
+until the end of the file or another match.
 .It Fl c
 Counts the matched lines in each file. Implies the
 .Fl q

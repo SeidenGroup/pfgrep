@@ -54,6 +54,7 @@ typedef struct pfgrep_state {
 	bool dont_replace_extension : 1;
 	/* Stat options */
 	bool dont_read_file : 1;
+	int after_lines;
 } pfgrep;
 
 typedef struct pfgrep_file {

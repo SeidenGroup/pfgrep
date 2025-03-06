@@ -25,8 +25,8 @@
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-cFHhiLlnpqrstwVvx] pattern files...\n", argv0);
-	fprintf(stderr, "usage: %s [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
+	fprintf(stderr, "usage: %s [-A num] [-cFHhiLlnpqrstwVvx] pattern files...\n", argv0);
+	fprintf(stderr, "usage: %s [-A num] [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
 }
 
 static uint32_t get_compile_flags(pfgrep *state)
@@ -56,6 +56,25 @@ static uint32_t get_extra_compile_flags(pfgrep *state)
 	return flags;
 }
 
+static bool print_line(pfgrep *state, File *file, const char *line, size_t line_size, int lineno)
+{
+	if (state->quiet && !state->print_count) {
+		// Special case: Early return since we don't
+		// to count or print more lines
+		return false;
+	} else if (!state->quiet) {
+		if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
+			printf("%s:", file->filename);
+		}
+		if (state->print_line_numbers) {
+			printf("%d:", lineno);
+		}
+		fwrite(line, line_size, 1, stdout);
+		putchar('\n');
+	}
+	return true;
+}
+
 int do_action(pfgrep *state, File *file)
 {
 	int matches = 0, rc = 0;
@@ -63,6 +82,7 @@ int do_action(pfgrep *state, File *file)
 	// We can have multiple expressions. Find the first match.
 	size_t pattern_count = json_object_array_length(state->patterns);
 	int lineno = 0;
+	int current_after_lines = 0;
 	char *line = state->conv_buffer, *next = NULL;
 	// If same CCSID, use read buffer, otherwise if EBCDIC/diff ASCII, conv
 	if (file->ccsid == state->pase_ccsid) {
@@ -113,20 +133,12 @@ int do_action(pfgrep *state, File *file)
 			}
 		} else if ((matched && !state->invert) || (!matched && state->invert)) {
 			matches++;
-			if (state->quiet && !state->print_count) {
-				// Special case: Early return since we don't
-				// to count or print more lines
+			current_after_lines = state->after_lines;
+			if (!print_line(state, file, line, conv_size, lineno)) {
 				goto fail;
-			} else if (!state->quiet) {
-				if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
-					printf("%s:", file->filename);
-				}
-				if (state->print_line_numbers) {
-					printf("%d:", lineno);
-				}
-				fwrite(line, conv_size, 1, stdout);
-				putchar('\n');
 			}
+		} else if (current_after_lines-- > 0) {
+			print_line(state, file, line, conv_size, lineno);
 		}
 
 		line = next;
@@ -233,8 +245,11 @@ int main(int argc, char **argv)
 	state.can_jit = can_jit;
 
 	int ch;
-	while ((ch = getopt(argc, argv, "ce:Ff:HhLlinpqrstwVvx")) != -1) {
+	while ((ch = getopt(argc, argv, "A:ce:Ff:HhLlinpqrstwVvx")) != -1) {
 		switch (ch) {
+		case 'A':
+			state.after_lines = atoi(optarg);
+			break;
 		case 'c':
 			state.print_count = true;
 			state.quiet = true; // Implied
