@@ -25,8 +25,8 @@
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-A num] [-cFHhiLlnpqrstwVvx] pattern files...\n", argv0);
-	fprintf(stderr, "usage: %s [-A num] [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
+	fprintf(stderr, "usage: %s [-A num] [-m matches] [-cFHhiLlnpqrstwVvx] pattern files...\n", argv0);
+	fprintf(stderr, "usage: %s [-A num] [-m matches] [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
 }
 
 static uint32_t get_compile_flags(pfgrep *state)
@@ -141,6 +141,10 @@ int do_action(pfgrep *state, File *file)
 			print_line(state, file, line, conv_size, lineno);
 		}
 
+		if (state->max_matches > 0 && matches >= state->max_matches) {
+			break;
+		}
+
 		line = next;
 	}
 fail:
@@ -245,7 +249,7 @@ int main(int argc, char **argv)
 	state.can_jit = can_jit;
 
 	int ch;
-	while ((ch = getopt(argc, argv, "A:ce:Ff:HhLlinpqrstwVvx")) != -1) {
+	while ((ch = getopt(argc, argv, "A:ce:Ff:HhLlim:npqrstwVvx")) != -1) {
 		switch (ch) {
 		case 'A':
 			state.after_lines = atoi(optarg);
@@ -285,6 +289,9 @@ int main(int argc, char **argv)
 			break;
 		case 'i':
 			state.case_insensitive = true;
+			break;
+		case 'm':
+			state.max_matches = atoi(optarg);
 			break;
 		case 'n':
 			state.print_line_numbers = true;

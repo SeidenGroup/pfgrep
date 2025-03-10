@@ -132,6 +132,15 @@ EOF
 EOF
 }
 
+@test "max matches" {
+	run pfgrep -m 2 'AB' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+
+	assert_output - <<EOF
+ABC
+AB
+EOF
+}
+
 @test "context lines after" {
 	run pfgrep -A 3 -n 'B[AC]' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 

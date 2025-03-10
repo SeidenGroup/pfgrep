@@ -197,6 +197,7 @@ The flags that can be passed are:
 * `-i`: Matches are case insensitive.
 * `-L`: Shows filenames that didn't match. Implies `-q`.
 * `-l`: Shows filenames that did match. Implies `-q`.
+* `-m`: Match only the number of lines specified.
 * `-n`: Shows the line number of a match. Note this is *not* the sequence number of a record; this is not yet supported.
 * `-p`: Searches non-source physical files. Note that non-source PFs are [subject to limitations][qsyslib-limits] (pfgrep reads PFs in binary mode).
 * `-q`: Doesn't print matches. The return code of pfgrep is unchanged though, so this is useful for i.e. conditionals in a script.

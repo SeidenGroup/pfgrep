@@ -9,6 +9,7 @@
 .Op Fl e Ar expression
 .Op Fl f Ar expression-file
 .Op Fl A Ar num
+.Op Fl m Ar num
 .Op Fl ceFHhiLlnpqrstwVvx
 .Op Ar expression
 .Ar files
@@ -69,6 +70,10 @@ flag.
 Shows filenames that did match. Implies the
 .Fl q
 flag.
+.It Fl m Ar num
+Match only
+.Ar num
+number of lines.
 .It Fl n
 Shows the line number of a match. Note that this is not the sequence number of a
 record for a physical file member.
