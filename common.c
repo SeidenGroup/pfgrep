@@ -78,7 +78,10 @@ static bool read_records(pfgrep *state, File *file, iconv_t conv)
 	}
 	state->read_buffer[file->file_size] = '\0';
 
-	size_t record_count = file->file_size / file->record_length;
+	size_t record_count = file->record_count;
+	if (record_count <= 0) {
+		record_count = file->file_size / file->record_length;
+	}
 	// record length * 6 for worst case UTF-8 conv + newline
 	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + record_count + 1;
 	if (conv_buf_size > state->conv_buffer_size) {
@@ -270,6 +273,14 @@ static int do_file(pfgrep *state, File *file)
 			perror_xpf(msg);
 		}
 		return -1;
+	}
+
+	// Get member info for an accurate record count
+	if (file->record_length != 0) {
+		if (!get_member_info(file) && !state->silent) {
+			snprintf(msg, sizeof(msg), "get_member_info(%s)", file->filename);
+			perror(msg);
+		}
 	}
 
 	// Open a conversion for this CCSID

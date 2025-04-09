@@ -77,6 +77,8 @@ bool get_member_info(File *file)
 		return false;
 	}
 
+	file->record_count = *(uint32_t*)(output + 0x8C);
+
 	// XXX: Convert to using struct
 	iconv_t sys_conv = get_iconv(37);
 	char *in = output + 0x30, *out = file->source_type;

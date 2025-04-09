@@ -63,7 +63,8 @@ typedef struct pfgrep_file {
 	int64_t file_size;
 	time_t mtime;
 	int fd;
-	int record_length;
+	int32_t record_count;
+	int16_t record_length;
 	uint16_t ccsid;
 	// EBCDIC space-padded + null terminated names for PFs
 	char libobj[21]; // object then library, QDBRTVFD needs
