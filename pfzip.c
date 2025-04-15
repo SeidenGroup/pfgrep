@@ -98,10 +98,6 @@ int do_action(pfgrep *state, File *file)
 	}
 
 	char path[PATH_MAX + 1];
-	// We'll need the member metadata for the comment and extension.
-	if (file->record_length != 0) {
-		get_member_info(file);
-	}
 	normalize_path(path, sizeof(path), file, !state->dont_replace_extension);
 	zip_int64_t index = zip_file_add(state->archive, path, s, 0);
 	if (index == -1 && !state->silent) {

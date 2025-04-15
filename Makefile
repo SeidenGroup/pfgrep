@@ -17,14 +17,17 @@ ZIP_LDFLAGS := $(shell pkg-config --libs libzip)
 # build with optimizations for release builds.
 ifdef DEBUG
 CFLAGS := -std=gnu11 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
+CXXFLAGS := -std=c++14 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
 LDFLAGS := -g -O0
 else
 CFLAGS := -std=gnu11 -Wall -Wextra -O2
+CXXFLAGS := -std=c++14 -Wall -Wextra -O2
 LDFLAGS := -O2
 endif
 
 # Use gcc 10 from Yum if available, otherwise try regular gcc on PATH
 CC := $(shell if type gcc-10 > /dev/null 2> /dev/null; then echo gcc-10; else echo gcc; fi)
+CXX := $(shell if type g++-10 > /dev/null 2> /dev/null; then echo g++-10; else echo g++; fi)
 LD := $(CC)
 AR := ar
 
@@ -49,6 +52,9 @@ pfzip: pfzip.o libpf.a
 
 %.o: %.c
 	$(CC) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(ZIP_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+
+%.o: %.cxx
+	$(CXX) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(ZIP_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 clean:
 	rm -f *.o *.a pfgrep pfcat pfstat pfcat core

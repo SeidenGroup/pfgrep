@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+extern "C" {
 #include <as400_protos.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -18,59 +19,24 @@
 
 #include <fcntl.h>
 #include "common.h"
+}
 
-static ILEpointer QUSRMBRD_pgm __attribute__ ((aligned (16)));
-static int QUSRMBRD_initialized = false;
+#include "pgmfunc.hxx"
 
 const char MBRD0200[] = {0xd4, 0xc2, 0xd9, 0xc4, 0xf0, 0xf2, 0xf0, 0xf0};
 
-static bool
-init_pgm (void)
-{
-	if (0 != _RSLOBJ2(&QUSRMBRD_pgm, RSLOBJ_TS_PGM, "QUSRMBRD", "QSYS")) {
-		perror("resolving QSYS/QUSRMBRD");
-		return false;
-	}
-	QUSRMBRD_initialized = true;
-	return true;
-}
-
-static void
-QUSRMBRD (char *output, const int *outlen, const char *format, const char *filename, const char *member, const char *override, ERRC0100 *error)
-{
-	if (!QUSRMBRD_initialized) {
-		if (!init_pgm()) {
-			abort();
-		}
-	}
-	/* Assume caller passes in EBCDIC */
-	void *pgm_argv[] = {
-		(void*)output,
-		(void*)outlen,
-		(void*)format,
-		(void*)filename,
-		(void*)member,
-		(void*)override,
-		(void*)error,
-		NULL
-	};
-	if (0 != _PGMCALL(&QUSRMBRD_pgm, pgm_argv, PGMCALL_EXCP_NOSIGNAL)) {
-		perror_xpf("QUSRMBRD");
-	}
-}
+static auto QUSRMBRD = PGMFunction<char*, int, const char*, const char*, const char*, const char, ERRC0100*>("QSYS", "QUSRMBRD"); 
 
 // assume EBCDIC
-bool get_member_info(File *file)
+extern "C" bool get_member_info(File *file)
 {
 	char output[8192];
 	memset(output, 0, 8192);
-	int outlen = sizeof(output);
-	const char override = 0xF0; /* EBCDIC '0' */
 
-	ERRC0100 errc = {0};
+	ERRC0100 errc = {};
 	errc.bytes_avail = sizeof(ERRC0100);
 
-	QUSRMBRD(output, &outlen, MBRD0200, file->libobj, file->member, &override, &errc);
+	QUSRMBRD(output, sizeof(output), MBRD0200, file->libobj, file->member, 0xF0, &errc);
 	if (errc.exception_id[0] != '\0') {
 		// XXX: Translate common messages like CPF5715 into ENOENT, etc.
 		errno = ENOSYS;
