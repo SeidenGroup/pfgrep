@@ -25,7 +25,7 @@ extern "C" {
 
 const char MBRD0200[] = {0xd4, 0xc2, 0xd9, 0xc4, 0xf0, 0xf2, 0xf0, 0xf0};
 
-static auto QUSRMBRD = PGMFunction<char*, int, const char*, const char*, const char*, const char, ERRC0100*>("QSYS", "QUSRMBRD"); 
+static PGMFunction<char*, int, const char*, const char*, const char*, const char, ERRC0100*> QUSRMBRD("QSYS", "QUSRMBRD");
 
 // assume EBCDIC
 extern "C" bool get_member_info(File *file)

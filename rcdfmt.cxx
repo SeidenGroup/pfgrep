@@ -28,7 +28,7 @@ const char _FILETYPE[] = {0x5c, 0xc6, 0xc9, 0xd3, 0xc5, 0xe3, 0xe8, 0xd7, 0xc5, 
 const char _INT[] = {0x5c, 0xc9, 0xd5, 0xe3, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};
 const char _EXT[] = {0x5c, 0xc5, 0xe7, 0xe3, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};
 
-static auto QDBRTVFD = PGMFunction<char*, int, char*, const char*, const char*, const char*, const char, const char*, const char*, ERRC0100*>("QSYS", "QDBRTVFD");
+static PGMFunction<char*, int, char*, const char*, const char*, const char*, const char, const char*, const char*, ERRC0100*> QDBRTVFD("QSYS", "QDBRTVFD");
 
 static json_object *cached_record_sizes = NULL;
 
