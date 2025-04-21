@@ -21,9 +21,10 @@ extern "C" {
 #include "common.h"
 }
 
+#include "ebcdic.hxx"
 #include "pgmfunc.hxx"
 
-const char MBRD0200[] = {0xd4, 0xc2, 0xd9, 0xc4, 0xf0, 0xf2, 0xf0, 0xf0};
+EF<8> MBRD0200("MBRD0200");
 
 static PGMFunction<char*, int, const char*, const char*, const char*, const char, ERRC0100*> QUSRMBRD("QSYS", "QUSRMBRD");
 
@@ -36,7 +37,7 @@ extern "C" bool get_member_info(File *file)
 	ERRC0100 errc = {};
 	errc.bytes_avail = sizeof(ERRC0100);
 
-	QUSRMBRD(output, sizeof(output), MBRD0200, file->libobj, file->member, 0xF0, &errc);
+	QUSRMBRD(output, sizeof(output), MBRD0200.value, file->libobj, file->member, '0'_e, &errc);
 	if (errc.exception_id[0] != '\0') {
 		// XXX: Translate common messages like CPF5715 into ENOENT, etc.
 		errno = ENOSYS;

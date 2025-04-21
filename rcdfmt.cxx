@@ -20,13 +20,13 @@ extern "C" {
 #include "common.h"
 }
 
+#include "ebcdic.hxx"
 #include "pgmfunc.hxx"
 
-const char FILD0100[] = {0xc6, 0xc9, 0xd3, 0xc4, 0xf0, 0xf1, 0xf0, 0xf0};
-const char _FIRST[] = {0x5c, 0xc6, 0xc9, 0xd9, 0xe2, 0xe3, 0x40, 0x40, 0x40, 0x40};
-const char _FILETYPE[] = {0x5c, 0xc6, 0xc9, 0xd3, 0xc5, 0xe3, 0xe8, 0xd7, 0xc5, 0x40};
-const char _INT[] = {0x5c, 0xc9, 0xd5, 0xe3, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};
-const char _EXT[] = {0x5c, 0xc5, 0xe7, 0xe3, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};
+EF<8> FILD0100("FILD0100");
+EF<10> _FIRST("*FIRST");
+EF<10> _FILETYPE("*FILETYPE");
+EF<10> _INT("*INT");
 
 static PGMFunction<char*, int, char*, const char*, const char*, const char*, const char, const char*, const char*, ERRC0100*> QDBRTVFD("QSYS", "QDBRTVFD");
 
@@ -65,7 +65,7 @@ extern "C" int get_pf_info(File *file)
 	ERRC0100 errc = {};
 	errc.bytes_avail = sizeof(ERRC0100);
 
-	QDBRTVFD(output, sizeof(output), output_filename, FILD0100, filename, _FIRST, 0xF0, _FILETYPE, _INT, &errc);
+	QDBRTVFD(output, sizeof(output), output_filename, FILD0100.value, filename, _FIRST.value, '1'_e, _FILETYPE.value, _INT.value, &errc);
 	if (errc.exception_id[0] != '\0') {
 		// XXX: Translate common messages like CPF5715 into ENOENT, etc.
 		errno = ENOSYS;
