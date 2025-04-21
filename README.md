@@ -99,7 +99,7 @@ pfgrep -w -r 'function' /QSYS.LIB/PROD.LIB /QSYS.LIB/DEV.LIB /QSYS.LIB/ALICE.LIB
 Search recursively with a regular expression:
 
 ```shell
-pfgrep -r 'pfgrep -r '^#(define|pragma).*Qp0l.*Attr' /QSYS.LIB/QSYSINC.LIB/H.FILE
+pfgrep -r '^#(define|pragma).*Qp0l.*Attr' /QSYS.LIB/QSYSINC.LIB/H.FILE
 ```
 
 Note that expansions with globs are performed by the shell, and not pfgrep.
