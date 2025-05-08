@@ -1,5 +1,5 @@
 Name: pfgrep
-Version: 0.5
+Version: 0.5.1
 Release: 0
 Summary: grep for source physical file members
 

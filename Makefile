@@ -1,4 +1,4 @@
-VERSION := 0.5
+VERSION := 0.5.1
 
 # DESTDIR can be set as well
 PREFIX := /QOpenSys/pkgs
