@@ -24,6 +24,9 @@ extern "C" {
 
 #include "common.hxx"
 
+class pfstat : public pfbase {
+};
+
 static void usage(char *argv0)
 {
 	fprintf(stderr, "usage: %s [-prV] files\n", argv0);
@@ -53,8 +56,7 @@ int do_action(pfbase *state, File *file)
 
 int main(int argc, char **argv)
 {
-	pfbase state = {};
-	common_init(&state);
+	auto state = pfstat();
 	state.dont_read_file = true;
 
 	int ch;
@@ -67,7 +69,7 @@ int main(int argc, char **argv)
 			state.recurse = true;
 			break;
 		case 'V':
-			print_version("pfstat");
+			state.print_version("pfstat");
 			return 0;
 		default:
 			usage(argv[0]);

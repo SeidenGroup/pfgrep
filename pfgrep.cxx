@@ -18,7 +18,9 @@ extern "C" {
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define PCRE2_CODE_UNIT_WIDTH 8
 #include </QOpenSys/usr/include/iconv.h>
+#include <pcre2.h>
 
 #include "errc.h"
 }
@@ -46,6 +48,8 @@ public:
 
 class pfgrep : public pfbase {
 public:
+	void print_version(const char *tool_name);
+
 	/* Pattern */
 	std::vector<std::unique_ptr<Pattern>> patterns;
 	pcre2_match_data *match_data;
@@ -63,6 +67,22 @@ public:
 	int max_matches;
 	int after_lines;
 };
+
+void pfgrep::print_version(const char *tool_name)
+{
+	pfbase::print_version(tool_name);
+	char pcre2_ver[256], pcre2_jit[256];
+	uint32_t pcre2_can_jit = 0;
+	pcre2_config(PCRE2_CONFIG_JIT, &pcre2_can_jit);
+	pcre2_config(PCRE2_CONFIG_VERSION, pcre2_ver);
+	fprintf(stderr, "\tusing PCRE2 %s", pcre2_ver);
+	if (pcre2_can_jit) {
+		pcre2_config(PCRE2_CONFIG_JITTARGET, pcre2_jit);
+		fprintf(stderr, " (JIT target: %s)\n", pcre2_jit);
+	} else {
+		fprintf(stderr, " (no JIT)\n");
+	}
+}
 
 static void usage(char *argv0)
 {
@@ -269,8 +289,7 @@ static bool add_patterns_from_file(pfgrep *state, const char *path)
 
 int main(int argc, char **argv)
 {
-	pfgrep state = {};
-	common_init(&state);
+	auto state = pfgrep();
 
 	// TODO: Decide to warn the user if JIT is disabled, or if JIT is on but
 	// the expression couldn't be compiled. For now, silently ignore errors.
@@ -345,7 +364,7 @@ int main(int argc, char **argv)
 			state.match_word = true;
 			break;
 		case 'V':
-			print_version("pfgrep");
+			state.print_version("pfgrep");
 			return 0;
 		case 'v':
 			state.invert = true;

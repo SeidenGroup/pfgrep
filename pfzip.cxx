@@ -28,12 +28,20 @@ extern "C" {
 
 class pfzip : public pfbase {
 public:
+	void print_version(const char *tool_name);
+
 	/* Archive */
 	zip_t *archive;
 	/* Archive options */
 	bool overwrite : 1;
 	bool dont_replace_extension : 1;
 };
+
+void pfzip::print_version(const char *tool_name)
+{
+	pfbase::print_version(tool_name);
+	fprintf(stderr, "\tusing libzip %s\n", zip_libzip_version());
+}
 
 static void usage(char *argv0)
 {
@@ -154,8 +162,7 @@ fail:
 
 int main(int argc, char **argv)
 {
-	pfzip state = {};
-	common_init(&state);
+	auto state = pfzip();
 
 	int ch;
 	while ((ch = getopt(argc, argv, "EprstWV")) != -1) {
@@ -179,7 +186,7 @@ int main(int argc, char **argv)
 			state.overwrite = true;
 			break;
 		case 'V':
-			print_version("pfzip");
+			state.print_version("pfzip");
 			return 0;
 		default:
 			usage(argv[0]);

@@ -24,6 +24,9 @@ extern "C" {
 
 #include "common.hxx"
 
+class pfcat : public pfbase {
+};
+
 static void usage(char *argv0)
 {
 	fprintf(stderr, "usage: %s [-prtV] files\n", argv0);
@@ -45,8 +48,7 @@ int do_action(pfbase *state, File *file)
 
 int main(int argc, char **argv)
 {
-	pfbase state = {};
-	common_init(&state);
+	auto state = pfcat();
 
 	int ch;
 	while ((ch = getopt(argc, argv, "prtV")) != -1) {
@@ -61,7 +63,7 @@ int main(int argc, char **argv)
 			state.dont_trim_ending_whitespace = true;
 			break;
 		case 'V':
-			print_version("pfcat");
+			state.print_version("pfcat");
 			return 0;
 		default:
 			usage(argv[0]);

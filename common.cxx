@@ -20,38 +20,24 @@ extern "C" {
 #include <unistd.h>
 
 #include </QOpenSys/usr/include/iconv.h>
-#include <zip.h>
 
 #include "errc.h"
 }
 
 #include "common.hxx"
 
-void print_version(const char *tool_name)
+void pfbase::print_version(const char *tool_name)
 {
 	fprintf(stderr, "%s " PFGREP_VERSION "\n", tool_name);
-	fprintf(stderr, "\tusing libzip %s\n", zip_libzip_version());
-	char pcre2_ver[256], pcre2_jit[256];
-	uint32_t pcre2_can_jit = 0;
-	pcre2_config(PCRE2_CONFIG_JIT, &pcre2_can_jit);
-	pcre2_config(PCRE2_CONFIG_VERSION, pcre2_ver);
-	fprintf(stderr, "\tusing PCRE2 %s", pcre2_ver);
-	if (pcre2_can_jit) {
-		pcre2_config(PCRE2_CONFIG_JITTARGET, pcre2_jit);
-		fprintf(stderr, " (JIT target: %s)\n", pcre2_jit);
-	} else {
-		fprintf(stderr, " (no JIT)\n");
-	}
-	fprintf(stderr, "\nCopyright (c) Seiden Group 2024-2025\n");
+	fprintf(stderr, "Copyright (c) Seiden Group 2024-2025\n");
 	fprintf(stderr, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n");
 	fprintf(stderr, "Written by Calvin Buckley and others, see <https://github.com/SeidenGroup/pfgrep/graphs/contributors>\n");
 }
 
-void common_init(pfbase *state)
+pfbase::pfbase()
 {
-	state->pase_ccsid = Qp2paseCCSID();
+	this->pase_ccsid = Qp2paseCCSID();
 }
-
 
 static bool read_records(pfbase *state, File *file, iconv_t conv)
 {

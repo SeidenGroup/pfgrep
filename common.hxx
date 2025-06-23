@@ -5,9 +5,7 @@
  */
 
 extern "C" {
-#define PCRE2_CODE_UNIT_WIDTH 8
 #include </QOpenSys/usr/include/iconv.h>
-#include <pcre2.h>
 }
 
 // In the worst case, a single byte character can become six bytes in UTF-8.
@@ -15,6 +13,9 @@ extern "C" {
 
 class pfbase {
 public:
+	pfbase();
+	void print_version(const char *tool_name);
+
 	/* Cached system info */
 	int pase_ccsid;
 	/* Files */
@@ -58,8 +59,6 @@ typedef struct pfgrep_file {
 int do_action(pfbase *state, File *file);
 
 /* common.c */
-void print_version(const char *tool_name);
-void common_init(pfbase *state);
 int do_thing(pfbase *state, const char *filename, bool from_recursion);
 
 extern "C" {
