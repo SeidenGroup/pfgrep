@@ -1,7 +1,9 @@
+#include <cstddef>
+
 /*
  * Copyright (c) 2025 Seiden Group
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: ISC
  */
 
 /* Conversion table generated mechanically by recode 3.7.14
@@ -43,7 +45,7 @@ constexpr unsigned char const ANSI_X3_4_1968_IBM037[256] =
      56,  57, 250, 251, 252, 253, 254, 255,     /* 248 - 255  */
   };
 
-constexpr char a2e(char a)
+static constexpr char a2e(char a)
 {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wchar-subscripts"
@@ -51,7 +53,7 @@ constexpr char a2e(char a)
 #pragma GCC diagnostic pop
 }
 
-constexpr char operator ""_e(char a)
+static constexpr char operator ""_e(char a)
 {
 	return a2e(a);
 }

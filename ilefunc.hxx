@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Seiden Group
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: ISC
  */
 
 extern "C" {
@@ -10,8 +10,8 @@ extern "C" {
 }
 
 #include <array>
-#include <cstring>
 #include <cstdlib>
+#include <string>
 
 /*
  * Type-safe compile-time wrapper for IBM i ILE service programs. ILE passes
@@ -88,9 +88,9 @@ template<typename T>
 class ILEArgument<T*> {
 public:
 	static constexpr size_t align() {
-		// Hardcode 16 in case we're using older IBM i headers
+		// Use sizeof in case we're using older IBM i headers
 		// without the correct alignment attributes for GCC.
-		return 16;
+		return sizeof(ILEpointer);
 	}
 
 	static constexpr arg_type_t type() {
@@ -167,8 +167,8 @@ public:
 		this->procedure = {};
 		// Invalid flags will result in... ILECALL_INVALID_FLAGS
 		this->flags = flags & (ILECALL_NOINTERRUPT | ILECALL_EXCP_NOSIGNAL);
-		strncpy(this->path, path, sizeof(this->path));
-		strncpy(this->symbol, symbol, sizeof(this->symbol));
+		this->path = path;
+		this->symbol = symbol;
 		this->signature = {
 			ILEArgument<TArgs>::type()..., ARG_END
 		};
@@ -181,12 +181,12 @@ public:
 		if (pid_matches) {
 			return true;
 		}
-		this->activation_mark = _ILELOADX(this->path, ILELOAD_LIBOBJ);
+		this->activation_mark = _ILELOADX(this->path.c_str(), ILELOAD_LIBOBJ);
 		// XXX: Should distinguish failure types
 		if (this->activation_mark == (ActivationMark)-1) {
 			return false;
 		}
-		if (_ILESYMX(&this->procedure, this->activation_mark, this->symbol) != ILESYM_PROCEDURE) {
+		if (_ILESYMX(&this->procedure, this->activation_mark, this->symbol.c_str()) != ILESYM_PROCEDURE) {
 			return false;
 		}
 		this->my_pid = current_pid;
@@ -211,6 +211,6 @@ private:
 	pid_t my_pid;
 	int flags;
 	ILEpointer procedure __attribute__ ((aligned (16)));
+	std::string path, symbol;
 	std::array<arg_type_t, sizeof...(TArgs) + 1> signature;
-	char path[256], symbol[256];
 };
