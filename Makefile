@@ -28,7 +28,7 @@ endif
 # Use gcc 10 from Yum if available, otherwise try regular gcc on PATH
 CC := $(shell if type gcc-10 > /dev/null 2> /dev/null; then echo gcc-10; else echo gcc; fi)
 CXX := $(shell if type g++-10 > /dev/null 2> /dev/null; then echo g++-10; else echo g++; fi)
-LD := $(CC)
+LD := $(CXX)
 AR := ar
 
 .PHONY: all clean install dist check
