@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+extern "C" {
 #include <as400_protos.h>
 #include <as400_types.h>
 #include <dirent.h>
@@ -18,10 +19,50 @@
 #include <unistd.h>
 
 #include </QOpenSys/usr/include/iconv.h>
-#include <linkhash.h>
 
-#include "common.h"
 #include "errc.h"
+}
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "common.hxx"
+
+class Pattern {
+public:
+	Pattern(const char *pattern, pcre2_code *re) {
+		this->pattern = std::string(pattern);
+		this->re = re;
+	}
+
+	~Pattern() {
+		pcre2_code_free(re);
+	}
+
+	std::string pattern;
+	pcre2_code *re;
+};
+
+class pfgrep : public pfbase {
+public:
+	/* Pattern */
+	std::vector<std::unique_ptr<Pattern>> patterns;
+	pcre2_match_data *match_data;
+	uint32_t biggest_capture_count;
+	bool can_jit : 1;
+	/* Options */
+	bool case_insensitive : 1;
+	bool always_print_filename : 1;
+	bool never_print_filename : 1;
+	bool print_line_numbers : 1;
+	bool invert : 1;
+	bool match_word : 1;
+	bool match_line : 1;
+	bool fixed : 1;
+	int max_matches;
+	int after_lines;
+};
 
 static void usage(char *argv0)
 {
@@ -75,12 +116,11 @@ static bool print_line(pfgrep *state, File *file, const char *line, size_t line_
 	return true;
 }
 
-int do_action(pfgrep *state, File *file)
+int do_action(pfbase *b_state, File *file)
 {
+	pfgrep *state = (pfgrep*)b_state;
 	int matches = 0, rc = 0;
 	uint32_t offset = 0, flags = 0;
-	// We can have multiple expressions. Find the first match.
-	size_t pattern_count = json_object_array_length(state->patterns);
 	int lineno = 0;
 	int current_after_lines = 0;
 	char *line = state->conv_buffer, *next = NULL;
@@ -104,9 +144,9 @@ int do_action(pfgrep *state, File *file)
 			conv_size = strlen(line);
 		}
 
-		for (size_t i = 0; i < pattern_count; i++) {
-			json_object *jso = json_object_array_get_idx(state->patterns, i);
-			pcre2_code *re = (pcre2_code*)json_object_get_userdata(jso);
+		// We can have multiple expressions. Find the first match.
+		for (const auto& pattern : state->patterns) {
+			pcre2_code *re = pattern->re;
 
 			// As long as we checked that the pattern successfully was JIT
 			// compiled, it should be safe to use pcre2_jit_match instead.
@@ -151,13 +191,6 @@ fail:
 	return matches;
 }
 
-static void cleanup_pattern(json_object *jso, void *userdata)
-{
-	(void)jso;
-	pcre2_code *re = (pcre2_code*)userdata;
-	pcre2_code_free(re);
-}
-
 static bool add_pattern(pfgrep *state, const char *expr)
 {
 	int errornumber;
@@ -199,9 +232,7 @@ static bool add_pattern(pfgrep *state, const char *expr)
 		}
 	}
 
-	json_object *obj = json_object_new_string(expr);
-	json_object_set_userdata(obj, (void*)re, cleanup_pattern);
-	json_object_array_add(state->patterns, obj);
+	state->patterns.push_back(std::make_unique<Pattern>(expr, re));
 	return true;
 }
 
@@ -238,9 +269,8 @@ static bool add_patterns_from_file(pfgrep *state, const char *path)
 
 int main(int argc, char **argv)
 {
-	pfgrep state = {0};
+	pfgrep state = {};
 	common_init(&state);
-	state.patterns = json_object_new_array();
 
 	// TODO: Decide to warn the user if JIT is disabled, or if JIT is on but
 	// the expression couldn't be compiled. For now, silently ignore errors.
@@ -330,7 +360,7 @@ int main(int argc, char **argv)
 	}
 
 	// If -e nor -f were used, expect expr as first arg
-	bool need_pattern_arg = json_object_array_length(state.patterns) == 0;
+	bool need_pattern_arg = state.patterns.size() == 0;
 
 	// We take physical files, no stdin, so we need expr + files
 	if (need_pattern_arg && optind + 1 >= argc) {
@@ -371,7 +401,6 @@ int main(int argc, char **argv)
 	// sanitizers/*grind when available on i
 	free_cached_iconv();
 	pcre2_match_data_free(state.match_data);
-	json_object_put(state.patterns);
 	free_cached_record_sizes();
 	free(state.read_buffer);
 	free(state.conv_buffer);

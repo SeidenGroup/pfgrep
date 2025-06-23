@@ -15,9 +15,9 @@ extern "C" {
 
 #include "errc.h"
 
-#include "common.h"
 }
 
+#include "common.hxx"
 #include "ebcdic.hxx"
 #include "pgmfunc.hxx"
 

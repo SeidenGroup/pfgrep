@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+extern "C" {
 #include <as400_protos.h>
 #include <as400_types.h>
 #include <dirent.h>
@@ -19,15 +20,16 @@
 #include <unistd.h>
 
 #include </QOpenSys/usr/include/iconv.h>
-#include <linkhash.h>
+#include <zip.h>
 
-#include "common.h"
 #include "errc.h"
+}
+
+#include "common.hxx"
 
 void print_version(const char *tool_name)
 {
 	fprintf(stderr, "%s " PFGREP_VERSION "\n", tool_name);
-	fprintf(stderr, "\tusing json-c %s\n", json_c_version());
 	fprintf(stderr, "\tusing libzip %s\n", zip_libzip_version());
 	char pcre2_ver[256], pcre2_jit[256];
 	uint32_t pcre2_can_jit = 0;
@@ -45,23 +47,17 @@ void print_version(const char *tool_name)
 	fprintf(stderr, "Written by Calvin Buckley and others, see <https://github.com/SeidenGroup/pfgrep/graphs/contributors>\n");
 }
 
-void common_init(pfgrep *state)
+void common_init(pfbase *state)
 {
-	// The default hashing algorithm linkhash uses is fine, but since we
-	// deal with 20 character strings with few allowed characters, it
-	// should be safe to use the simpler "Perl-like" hash, which is a bit
-	// faster than the default.
-	json_global_set_string_hash(JSON_C_STR_HASH_PERLLIKE);
-
 	state->pase_ccsid = Qp2paseCCSID();
 }
 
 
-static bool read_records(pfgrep *state, File *file, iconv_t conv)
+static bool read_records(pfbase *state, File *file, iconv_t conv)
 {
 	size_t read_buf_size = file->file_size + 1;
 	if (read_buf_size > state->read_buffer_size) {
-		state->read_buffer = realloc(state->read_buffer, read_buf_size);
+		state->read_buffer = (char*)realloc(state->read_buffer, read_buf_size);
 		state->read_buffer_size = read_buf_size;
 	}
 	int bytes_to_read = file->file_size;
@@ -85,7 +81,7 @@ static bool read_records(pfgrep *state, File *file, iconv_t conv)
 	// record length * 6 for worst case UTF-8 conv + newline
 	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + record_count + 1;
 	if (conv_buf_size > state->conv_buffer_size) {
-		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
+		state->conv_buffer = (char*)realloc(state->conv_buffer, conv_buf_size);
 		state->conv_buffer_size = conv_buf_size;
 	}
 	char *out = state->conv_buffer;
@@ -120,11 +116,11 @@ static bool read_records(pfgrep *state, File *file, iconv_t conv)
 	return true;
 }
 
-static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
+static bool read_streamfile(pfbase *state, File *file, iconv_t conv)
 {
 	size_t read_buf_size = file->file_size + 1;
 	if (read_buf_size > state->read_buffer_size) {
-		state->read_buffer = realloc(state->read_buffer, read_buf_size);
+		state->read_buffer = (char*)realloc(state->read_buffer, read_buf_size);
 		state->read_buffer_size = read_buf_size;
 	}
 	int bytes_to_read = file->file_size;
@@ -132,7 +128,7 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 	// Assume max length plus newline character for each line
 	size_t conv_buf_size = read_buf_size + record_count;
 	if (conv_buf_size > state->conv_buffer_size) {
-		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
+		state->conv_buffer = (char*)realloc(state->conv_buffer, conv_buf_size);
 		state->conv_buffer_size = conv_buf_size;
 	}
 	// Read the whole file in
@@ -173,7 +169,7 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 /**
  * Recurse through a directory or physical file.
  */
-static int do_directory(pfgrep *state, const char *directory)
+static int do_directory(pfbase *state, const char *directory)
 {
 	char msg[PATH_MAX + 256];
 	int files_matched = 0;
@@ -221,7 +217,7 @@ static int do_directory(pfgrep *state, const char *directory)
 	return files_matched;
 }
 
-static bool set_record_length(pfgrep *state, File *file)
+static bool set_record_length(pfbase *state, File *file)
 {
 	// Determine the record length, the API to do this needs traditional paths.
 	// Note that it will resolve symlinks for us, so i.e. /QIBM/include works
@@ -256,7 +252,7 @@ static bool set_record_length(pfgrep *state, File *file)
 	return false;
 }
 
-static int do_file(pfgrep *state, File *file)
+static int do_file(pfbase *state, File *file)
 {
 	char msg[PATH_MAX + 256];
 	int matches = -1;
@@ -328,12 +324,12 @@ fail:
 	return matches;
 }
 
-int do_thing(pfgrep *state, const char *filename, bool from_recursion)
+int do_thing(pfbase *state, const char *filename, bool from_recursion)
 {
 	char msg[PATH_MAX + 256];
 	int matches = 0;
-	struct stat64_ILE s = {0};
-	File f = {0};
+	struct stat64_ILE s = {};
+	File f = {};
 
 	f.filename = filename;
 	// IBM messed up the statx declaration, it doesn't write

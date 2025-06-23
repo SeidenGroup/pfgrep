@@ -7,7 +7,7 @@
 #include <as400_protos.h>
 #include <stdbool.h>
 
-#include "common.h"
+#include </QOpenSys/usr/include/iconv.h>
 
 // These contain conversions from convs[N] to system PASE CCSID, memoized to
 // avoid constantly reopening iconv for conversion. Gets closed on exit.

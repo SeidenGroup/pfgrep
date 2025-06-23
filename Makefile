@@ -8,8 +8,6 @@ TESTLIB := pfgreptest
 # Can be overriden for your own PCRE2 or json-c build
 PCRE2_CFLAGS := $(shell pkg-config --cflags libpcre2-8)
 PCRE2_LDFLAGS := $(shell pkg-config --libs libpcre2-8)
-JSONC_CFLAGS := $(shell pkg-config --cflags json-c)
-JSONC_LDFLAGS := $(shell pkg-config --libs json-c)
 ZIP_CFLAGS := $(shell pkg-config --cflags libzip)
 ZIP_LDFLAGS := $(shell pkg-config --libs libzip)
 
@@ -39,22 +37,22 @@ libpf.a: common.o conv.o errc.o convpath.o rcdfmt.o mbrinfo.o
 	$(AR) -X64 cru $@ $^
 
 pfgrep: pfgrep.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfcat: pfcat.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfstat: pfstat.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfzip: pfzip.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
-	$(CC) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(ZIP_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+	$(CC) $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 %.o: %.cxx
-	$(CXX) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(ZIP_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+	$(CXX) $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 clean:
 	rm -f *.o *.a pfgrep pfcat pfstat pfcat core

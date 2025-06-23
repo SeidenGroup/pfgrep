@@ -12,10 +12,10 @@ extern "C" {
 #include <stdlib.h>
 #include <wchar.h>
 
-#include "common.h"
 #include "errc.h"
 }
 
+#include "common.hxx"
 #include "ebcdic.hxx"
 #include "ilefunc.hxx"
 

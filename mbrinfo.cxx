@@ -13,14 +13,12 @@ extern "C" {
 #include <string.h>
 #include <sys/errno.h>
 
-#include <json_object.h>
-
 #include "errc.h"
 
 #include <fcntl.h>
-#include "common.h"
 }
 
+#include "common.hxx"
 #include "ebcdic.hxx"
 #include "pgmfunc.hxx"
 

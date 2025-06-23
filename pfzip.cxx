@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+extern "C" {
 #include <as400_protos.h>
 #include <as400_types.h>
 #include <dirent.h>
@@ -20,9 +21,19 @@
 #include <unistd.h>
 
 #include <zip.h>
+}
 
-#include "common.h"
+#include "common.hxx"
 #include "errc.h"
+
+class pfzip : public pfbase {
+public:
+	/* Archive */
+	zip_t *archive;
+	/* Archive options */
+	bool overwrite : 1;
+	bool dont_replace_extension : 1;
+};
 
 static void usage(char *argv0)
 {
@@ -77,8 +88,10 @@ static void normalize_path(char *output, size_t output_size, File *file, bool re
 	strncpy(output, input, output_size);
 }
 
-int do_action(pfgrep *state, File *file)
+int do_action(pfbase *b_state, File *file)
 {
+	pfzip *state = (pfzip*)b_state;
+	zip_int64_t index = -1;
 	int ret = 1, nonfatal_ret;
 	const char *buf = state->conv_buffer;
 	if (file->record_length == 0 && file->ccsid == state->pase_ccsid) {
@@ -93,13 +106,12 @@ int do_action(pfgrep *state, File *file)
 		fprintf(stderr, "zip_source_buffer(%s): %s\n",
 			file->filename,
 			zip_strerror(state->archive));
-		ret = -1;
 		goto fail;
 	}
 
 	char path[PATH_MAX + 1];
 	normalize_path(path, sizeof(path), file, !state->dont_replace_extension);
-	zip_int64_t index = zip_file_add(state->archive, path, s, 0);
+	index = zip_file_add(state->archive, path, s, 0);
 	if (index == -1 && !state->silent) {
 		fprintf(stderr, "zip_file_add(%s): %s\n",
 			file->filename,
@@ -142,7 +154,7 @@ fail:
 
 int main(int argc, char **argv)
 {
-	pfgrep state = {0};
+	pfzip state = {};
 	common_init(&state);
 
 	int ch;
