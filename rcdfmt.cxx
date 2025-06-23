@@ -13,8 +13,6 @@ extern "C" {
 #include <string.h>
 #include <sys/errno.h>
 
-#include <json_object.h>
-
 #include "errc.h"
 
 #include "common.h"
@@ -23,6 +21,9 @@ extern "C" {
 #include "ebcdic.hxx"
 #include "pgmfunc.hxx"
 
+#include <map>
+#include <string>
+
 EF<8> FILD0100("FILD0100");
 EF<10> _FIRST("*FIRST");
 EF<10> _FILETYPE("*FILETYPE");
@@ -30,11 +31,10 @@ EF<10> _INT("*INT");
 
 static PGMFunction<char*, int, char*, const char*, const char*, const char*, const char, const char*, const char*, ERRC0100*> QDBRTVFD("QSYS", "QDBRTVFD");
 
-static json_object *cached_record_sizes = NULL;
+static std::map<std::string, int> cached_record_sizes;
 
 extern "C" void free_cached_record_sizes(void)
 {
-	json_object_put(cached_record_sizes);
 }
 
 /**
@@ -44,20 +44,15 @@ extern "C" void free_cached_record_sizes(void)
  */
 extern "C" int get_pf_info(File *file)
 {
-	const char *filename = file->libobj;
+	// XXX: Is it better to use array<char, 20>?
+	std::string filename(file->libobj, 20);
 	// Look at our cached records first
-	if (cached_record_sizes == NULL) {
-		cached_record_sizes = json_object_new_object();
-	}
-	json_object *cached_record_size = json_object_object_get(cached_record_sizes, filename);
-	if (cached_record_size != NULL) {
-		return json_object_get_int(cached_record_size);
+	auto cached_record_size = cached_record_sizes.find(filename);
+	if (cached_record_size != cached_record_sizes.end()) {
+		return cached_record_size->second;
 	}
 
-	/* It might look at the output filename... */
 	char output_filename[21];
-	memcpy(output_filename, filename, 21);
-
 	/* XXX: Convert to using a Qdb_Qdbfh structure... */
 	char output[8192];
 	memset(output, 0, 8192);
@@ -65,7 +60,7 @@ extern "C" int get_pf_info(File *file)
 	ERRC0100 errc = {};
 	errc.bytes_avail = sizeof(ERRC0100);
 
-	QDBRTVFD(output, sizeof(output), output_filename, FILD0100.value, filename, _FIRST.value, '1'_e, _FILETYPE.value, _INT.value, &errc);
+	QDBRTVFD(output, sizeof(output), output_filename, FILD0100.value, filename.data(), _FIRST.value, '1'_e, _FILETYPE.value, _INT.value, &errc);
 	if (errc.exception_id[0] != '\0') {
 		// XXX: Translate common messages like CPF5715 into ENOENT, etc.
 		errno = ENOSYS;
@@ -102,8 +97,7 @@ extern "C" int get_pf_info(File *file)
 	// Compress return value into a single integer that's easily stored
 	int ret = Qdbfhfsu ? Qdbfmxrl : -Qdbfmxrl;
 
-	// Safe to use JSON_C_OBJECT_ADD_KEY_IS_NEW since we check beforehand
-	json_object_object_add_ex(cached_record_sizes, filename, json_object_new_int(ret), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+	cached_record_sizes[filename] = ret;
 
 	return ret;
 }
