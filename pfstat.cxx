@@ -25,6 +25,8 @@ extern "C" {
 #include "common.hxx"
 
 class pfstat : public pfbase {
+public:
+	int do_action(File *file) override;
 };
 
 static void usage(char *argv0)
@@ -32,13 +34,13 @@ static void usage(char *argv0)
 	fprintf(stderr, "usage: %s [-prV] files\n", argv0);
 }
 
-int do_action(pfbase *state, File *file)
+int pfstat::do_action(File *file)
 {
 	if (file->record_length != 0) {
 		get_member_info(file);
 	} else {
 		// Better off using i.e. stat
-		if (state->silent) {
+		if (this->silent) {
 			fprintf(stderr, "%s: Not a member\n",
 				file->filename);
 		}
@@ -80,7 +82,7 @@ int main(int argc, char **argv)
 	state.file_count = argc - optind;
 	bool any_match = false, any_error = false;
 	for (int i = optind; i < argc; i++) {
-		int ret = do_thing(&state, argv[i], false);
+		int ret = state.do_thing(argv[i], false);
 		if (ret > 0) {
 			any_match = true;
 		} else if (ret < 0) {

@@ -28,6 +28,7 @@ extern "C" {
 
 class pfzip : public pfbase {
 public:
+	int do_action(File *file) override;
 	void print_version(const char *tool_name);
 
 	/* Archive */
@@ -96,34 +97,33 @@ static void normalize_path(char *output, size_t output_size, File *file, bool re
 	strncpy(output, input, output_size);
 }
 
-int do_action(pfbase *b_state, File *file)
+int pfzip::do_action(File *file)
 {
-	pfzip *state = (pfzip*)b_state;
 	zip_int64_t index = -1;
 	int ret = 1, nonfatal_ret;
-	const char *buf = state->conv_buffer;
-	if (file->record_length == 0 && file->ccsid == state->pase_ccsid) {
-		buf = state->read_buffer;
+	const char *buf = this->conv_buffer;
+	if (file->record_length == 0 && file->ccsid == this->pase_ccsid) {
+		buf = this->read_buffer;
 	}
 	size_t len = strlen(buf);
 	// we must keep a copy around until zip_close, and we reread the buffer
 	// therefore make a copy (NBD) and tell libzip to free (last parm)
 	char *buf_copy = strdup(buf);
-	zip_source_t *s = zip_source_buffer(state->archive, buf_copy, len, 1);
-	if (s == NULL && !state->silent) {
+	zip_source_t *s = zip_source_buffer(this->archive, buf_copy, len, 1);
+	if (s == NULL && !this->silent) {
 		fprintf(stderr, "zip_source_buffer(%s): %s\n",
 			file->filename,
-			zip_strerror(state->archive));
+			zip_strerror(this->archive));
 		goto fail;
 	}
 
 	char path[PATH_MAX + 1];
-	normalize_path(path, sizeof(path), file, !state->dont_replace_extension);
-	index = zip_file_add(state->archive, path, s, 0);
-	if (index == -1 && !state->silent) {
+	normalize_path(path, sizeof(path), file, !this->dont_replace_extension);
+	index = zip_file_add(this->archive, path, s, 0);
+	if (index == -1 && !this->silent) {
 		fprintf(stderr, "zip_file_add(%s): %s\n",
 			file->filename,
-			zip_strerror(state->archive));
+			zip_strerror(this->archive));
 		zip_source_free(s);
 		ret = -1;
 		goto fail;
@@ -145,13 +145,13 @@ int do_action(pfbase *b_state, File *file)
 			file->ccsid);
 	}
 	// not critical if these fail, but do warn
-	nonfatal_ret = zip_file_set_comment(state->archive, index, comment, strlen(comment), 0);
-	if (nonfatal_ret && !state->silent) {
+	nonfatal_ret = zip_file_set_comment(this->archive, index, comment, strlen(comment), 0);
+	if (nonfatal_ret && !this->silent) {
 		fprintf(stderr, "zip_file_set_comment: Can't set comment for %s",
 			file->filename);
 	}
-	nonfatal_ret = zip_file_set_mtime(state->archive, index, file->mtime, 0);
-	if (nonfatal_ret && !state->silent) {
+	nonfatal_ret = zip_file_set_mtime(this->archive, index, file->mtime, 0);
+	if (nonfatal_ret && !this->silent) {
 		fprintf(stderr, "zip_file_set_comment: Can't set modification time (%zd) for %s",
 			file->mtime,
 			file->filename);
@@ -222,7 +222,7 @@ int main(int argc, char **argv)
 
 	bool any_match = false, any_error = false;
 	for (int i = optind; i < argc; i++) {
-		int ret = do_thing(&state, argv[i], false);
+		int ret = state.do_thing(argv[i], false);
 		if (ret > 0) {
 			any_match = true;
 		} else if (ret < 0) {

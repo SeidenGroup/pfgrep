@@ -11,10 +11,28 @@ extern "C" {
 // In the worst case, a single byte character can become six bytes in UTF-8.
 #define UTF8_SCALE_FACTOR 6
 
+typedef struct pfgrep_file {
+	const char *filename; // IFS
+	int64_t file_size;
+	time_t mtime;
+	int fd;
+	int32_t record_count;
+	int16_t record_length;
+	uint16_t ccsid;
+	// EBCDIC space-padded + null terminated names for PFs
+	char libobj[21]; // object then library, QDBRTVFD needs
+	char member[11];
+	// Filled in from get_mbr_info
+	char source_type[(10 * UTF8_SCALE_FACTOR) + 1];
+	char description[(50 * UTF8_SCALE_FACTOR) + 1];
+} File;
+
 class pfbase {
 public:
 	pfbase();
 	void print_version(const char *tool_name);
+	virtual int do_action(File *file) = 0;
+	int do_thing(const char *filename, bool from_recursion);
 
 	/* Cached system info */
 	int pase_ccsid;
@@ -37,29 +55,13 @@ public:
 	bool print_count : 1;
 	/* Stat options */
 	bool dont_read_file : 1;
+private:
+	bool read_records(File *file, iconv_t conv);
+	bool read_streamfile(File *file, iconv_t conv);
+	bool set_record_length(File *file);
+	int do_directory(const char *directory);
+	int do_file(File *file);
 };
-
-typedef struct pfgrep_file {
-	const char *filename; // IFS
-	int64_t file_size;
-	time_t mtime;
-	int fd;
-	int32_t record_count;
-	int16_t record_length;
-	uint16_t ccsid;
-	// EBCDIC space-padded + null terminated names for PFs
-	char libobj[21]; // object then library, QDBRTVFD needs
-	char member[11];
-	// Filled in from get_mbr_info
-	char source_type[(10 * UTF8_SCALE_FACTOR) + 1];
-	char description[(50 * UTF8_SCALE_FACTOR) + 1];
-} File;
-
-/* this is per-tool */
-int do_action(pfbase *state, File *file);
-
-/* common.c */
-int do_thing(pfbase *state, const char *filename, bool from_recursion);
 
 extern "C" {
 /* conv.c */

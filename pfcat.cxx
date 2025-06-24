@@ -25,6 +25,8 @@ extern "C" {
 #include "common.hxx"
 
 class pfcat : public pfbase {
+public:
+	int do_action(File *file) override;
 };
 
 static void usage(char *argv0)
@@ -32,16 +34,16 @@ static void usage(char *argv0)
 	fprintf(stderr, "usage: %s [-prtV] files\n", argv0);
 }
 
-int do_action(pfbase *state, File *file)
+int pfcat::do_action(File *file)
 {
 	if (file->record_length == 0) {
-		if (file->ccsid == state->pase_ccsid) {
-			printf("%s", state->read_buffer);
+		if (file->ccsid == this->pase_ccsid) {
+			printf("%s", this->read_buffer);
 		} else {
-			printf("%s", state->conv_buffer);
+			printf("%s", this->conv_buffer);
 		}
 	} else {
-		printf("%s", state->conv_buffer);
+		printf("%s", this->conv_buffer);
 	}
 	return 0;
 }
@@ -74,7 +76,7 @@ int main(int argc, char **argv)
 	state.file_count = argc - optind;
 	bool any_match = false, any_error = false;
 	for (int i = optind; i < argc; i++) {
-		int ret = do_thing(&state, argv[i], false);
+		int ret = state.do_thing(argv[i], false);
 		if (ret > 0) {
 			any_match = true;
 		} else if (ret < 0) {

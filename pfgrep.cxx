@@ -48,6 +48,7 @@ public:
 
 class pfgrep : public pfbase {
 public:
+	int do_action(File *file) override;
 	void print_version(const char *tool_name);
 
 	/* Pattern */
@@ -136,17 +137,16 @@ static bool print_line(pfgrep *state, File *file, const char *line, size_t line_
 	return true;
 }
 
-int do_action(pfbase *b_state, File *file)
+int pfgrep::do_action(File *file)
 {
-	pfgrep *state = (pfgrep*)b_state;
 	int matches = 0, rc = 0;
 	uint32_t offset = 0, flags = 0;
 	int lineno = 0;
 	int current_after_lines = 0;
-	char *line = state->conv_buffer, *next = NULL;
+	char *line = this->conv_buffer, *next = NULL;
 	// If same CCSID, use read buffer, otherwise if EBCDIC/diff ASCII, conv
-	if (file->ccsid == state->pase_ccsid) {
-		line = state->read_buffer;
+	if (file->ccsid == this->pase_ccsid) {
+		line = this->read_buffer;
 	}
 	while (line && *line) {
 		bool matched = false;
@@ -165,15 +165,15 @@ int do_action(pfbase *b_state, File *file)
 		}
 
 		// We can have multiple expressions. Find the first match.
-		for (const auto& pattern : state->patterns) {
+		for (const auto& pattern : this->patterns) {
 			pcre2_code *re = pattern->re;
 
 			// As long as we checked that the pattern successfully was JIT
 			// compiled, it should be safe to use pcre2_jit_match instead.
-			if (state->can_jit) {
-				rc = pcre2_jit_match(re, (PCRE2_SPTR)line, conv_size, offset, flags, state->match_data, NULL);
+			if (this->can_jit) {
+				rc = pcre2_jit_match(re, (PCRE2_SPTR)line, conv_size, offset, flags, this->match_data, NULL);
 			} else {
-				rc = pcre2_match(re, (PCRE2_SPTR)line, conv_size, offset, flags, state->match_data, NULL);
+				rc = pcre2_match(re, (PCRE2_SPTR)line, conv_size, offset, flags, this->match_data, NULL);
 			}
 
 			if (rc > 0) {
@@ -186,22 +186,22 @@ int do_action(pfbase *b_state, File *file)
 		}
 
 		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
-			if (!state->silent) {
+			if (!this->silent) {
 				PCRE2_UCHAR buffer[256];
 				pcre2_get_error_message(rc, buffer, sizeof(buffer));
 				fprintf(stderr, "failed match error: %s (%d)\n", buffer, rc);
 			}
-		} else if ((matched && !state->invert) || (!matched && state->invert)) {
+		} else if ((matched && !this->invert) || (!matched && this->invert)) {
 			matches++;
-			current_after_lines = state->after_lines;
-			if (!print_line(state, file, line, conv_size, lineno)) {
+			current_after_lines = this->after_lines;
+			if (!print_line(this, file, line, conv_size, lineno)) {
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
-			print_line(state, file, line, conv_size, lineno);
+			print_line(this, file, line, conv_size, lineno);
 		}
 
-		if (state->max_matches > 0 && matches >= state->max_matches) {
+		if (this->max_matches > 0 && matches >= this->max_matches) {
 			break;
 		}
 
@@ -407,7 +407,7 @@ int main(int argc, char **argv)
 	state.file_count = argc - optind;
 	bool any_match = false, any_error = false;
 	for (int i = optind; i < argc; i++) {
-		int ret = do_thing(&state, argv[i], false);
+		int ret = state.do_thing(argv[i], false);
 		if (ret > 0) {
 			any_match = true;
 		} else if (ret < 0) {
