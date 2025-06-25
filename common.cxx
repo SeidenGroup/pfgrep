@@ -39,6 +39,17 @@ pfbase::pfbase()
 	this->pase_ccsid = Qp2paseCCSID();
 }
 
+pfbase::~pfbase()
+{
+#ifdef DEBUG
+	// This deinitialization may be unnecessary, do it for future use of
+	// sanitizers/*grind when available on i
+	free_cached_iconv();
+	free(this->read_buffer);
+	free(this->conv_buffer);
+#endif
+}
+
 bool pfbase::read_records(File *file, iconv_t conv)
 {
 	size_t read_buf_size = file->file_size + 1;

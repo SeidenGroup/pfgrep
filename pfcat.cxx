@@ -84,14 +84,5 @@ int main(int argc, char **argv)
 		}
 	}
 
-#ifdef DEBUG
-	// This deinitialization may be unnecessary, do it for future use of
-	// sanitizers/*grind when available on i
-	free_cached_iconv();
-	free_cached_record_sizes();
-	free(state.read_buffer);
-	free(state.conv_buffer);
-#endif
-
 	return any_error ? 2 : (any_match ? 0 : 1);
 }

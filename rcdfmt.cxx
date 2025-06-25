@@ -33,10 +33,6 @@ static PGMFunction<char*, int, char*, const char*, const char*, const char*, con
 
 static std::map<std::string, int> cached_record_sizes;
 
-extern "C" void free_cached_record_sizes(void)
-{
-}
-
 /**
  * Gets information about a physical file. Returns the record length as a
  * positive number if source PF, as a negative number if not, and 0 if error.

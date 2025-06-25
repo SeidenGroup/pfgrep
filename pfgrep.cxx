@@ -48,8 +48,16 @@ public:
 
 class pfgrep : public pfbase {
 public:
+	pfgrep() = default;
+	// disable copy constructor for unique_ptr
+	pfgrep(const pfgrep&) = delete;
+	pfgrep& operator=(const pfgrep&) = delete;
+
+	~pfgrep();
 	int do_action(File *file) override;
 	void print_version(const char *tool_name);
+	bool add_pattern(const char *expr);
+	bool add_patterns_from_file(const char *path);
 
 	/* Pattern */
 	std::vector<std::unique_ptr<Pattern>> patterns;
@@ -67,7 +75,19 @@ public:
 	bool fixed : 1;
 	int max_matches;
 	int after_lines;
+
+private:
+	uint32_t get_compile_flags();
+	uint32_t get_extra_compile_flags();
+	bool print_line(File *file, const char *line, size_t line_size, int lineno);
 };
+
+pfgrep::~pfgrep()
+{
+#ifdef DEBUG
+	pcre2_match_data_free(this->match_data);
+#endif
+}
 
 void pfgrep::print_version(const char *tool_name)
 {
@@ -91,44 +111,44 @@ static void usage(char *argv0)
 	fprintf(stderr, "usage: %s [-A num] [-m matches] [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
 }
 
-static uint32_t get_compile_flags(pfgrep *state)
+uint32_t pfgrep::get_compile_flags()
 {
 	uint32_t flags = 0;
-	if (state->case_insensitive) {
+	if (this->case_insensitive) {
 		flags |= PCRE2_CASELESS;
 	}
 	// XXX: We might consider using i.e. str(case)str instead, since it's
 	// possibly faster than using PCRE, but it does work w/ the other PCRE
 	// flags like matching words/lines, so...
-	if (state->fixed) {
+	if (this->fixed) {
 		flags |= PCRE2_LITERAL;
 	}
 	return flags;
 }
 
-static uint32_t get_extra_compile_flags(pfgrep *state)
+uint32_t pfgrep::get_extra_compile_flags()
 {
 	uint32_t flags = 0;
-	if (state->match_word) {
+	if (this->match_word) {
 		flags |= PCRE2_EXTRA_MATCH_WORD;
 	}
-	if (state->match_line) {
+	if (this->match_line) {
 		flags |= PCRE2_EXTRA_MATCH_LINE;
 	}
 	return flags;
 }
 
-static bool print_line(pfgrep *state, File *file, const char *line, size_t line_size, int lineno)
+bool pfgrep::print_line(File *file, const char *line, size_t line_size, int lineno)
 {
-	if (state->quiet && !state->print_count) {
+	if (this->quiet && !this->print_count) {
 		// Special case: Early return since we don't
 		// to count or print more lines
 		return false;
-	} else if (!state->quiet) {
-		if ((state->file_count > 1 && !state->never_print_filename) || state->always_print_filename) {
+	} else if (!this->quiet) {
+		if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
 			printf("%s:", file->filename);
 		}
-		if (state->print_line_numbers) {
+		if (this->print_line_numbers) {
 			printf("%d:", lineno);
 		}
 		fwrite(line, line_size, 1, stdout);
@@ -194,11 +214,11 @@ int pfgrep::do_action(File *file)
 		} else if ((matched && !this->invert) || (!matched && this->invert)) {
 			matches++;
 			current_after_lines = this->after_lines;
-			if (!print_line(this, file, line, conv_size, lineno)) {
+			if (!print_line(file, line, conv_size, lineno)) {
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
-			print_line(this, file, line, conv_size, lineno);
+			print_line(file, line, conv_size, lineno);
 		}
 
 		if (this->max_matches > 0 && matches >= this->max_matches) {
@@ -211,15 +231,15 @@ fail:
 	return matches;
 }
 
-static bool add_pattern(pfgrep *state, const char *expr)
+bool pfgrep::add_pattern(const char *expr)
 {
 	int errornumber;
 	PCRE2_SIZE erroroffset;
 	pcre2_compile_context *compile_ctx = pcre2_compile_context_create(NULL);
-	pcre2_set_compile_extra_options(compile_ctx, get_extra_compile_flags(state));
+	pcre2_set_compile_extra_options(compile_ctx, get_extra_compile_flags());
 	pcre2_code *re = pcre2_compile((PCRE2_SPTR)expr,
 			PCRE2_ZERO_TERMINATED,
-			get_compile_flags(state),
+			get_compile_flags(),
 			&errornumber,
 			&erroroffset,
 			compile_ctx);
@@ -236,27 +256,27 @@ static bool add_pattern(pfgrep *state, const char *expr)
 	// Allocate the largest required match_data later.
 	uint32_t capture_count = 0;
 	pcre2_pattern_info(re, PCRE2_INFO_CAPTURECOUNT, &capture_count);
-	if (capture_count > state->biggest_capture_count) {
-		state->biggest_capture_count = capture_count;
+	if (capture_count > this->biggest_capture_count) {
+		this->biggest_capture_count = capture_count;
 	}
 
 	// We should probably be seeing if the JIT status is usable per-expr...
-	if (state->can_jit) {
+	if (this->can_jit) {
 		size_t jit_size = 0;
 		int jit_ret = pcre2_jit_compile(re, PCRE2_JIT_COMPLETE);
 		if (jit_ret == 0) {
 			jit_ret = pcre2_pattern_info(re, PCRE2_INFO_JITSIZE, &jit_size);
 			if (jit_ret != 0 || jit_size == 0) {
-				state->can_jit = false;
+				this->can_jit = false;
 			}
 		}
 	}
 
-	state->patterns.push_back(std::make_unique<Pattern>(expr, re));
+	this->patterns.push_back(std::make_unique<Pattern>(expr, re));
 	return true;
 }
 
-static bool add_patterns_from_file(pfgrep *state, const char *path)
+bool pfgrep::add_patterns_from_file(const char *path)
 {
 	FILE *f = strcmp(path, "-") == 0 ? stdin : fopen(path, "r");
 	if (f == NULL) {
@@ -272,7 +292,7 @@ static bool add_patterns_from_file(pfgrep *state, const char *path)
 		if (line_len > 0 && line[line_len - 1] == '\n') {
 			line[line_len - 1] = '\0';
 		}
-		if (line_len > 0 && !add_pattern(state, line)) {
+		if (line_len > 0 && !add_pattern(line)) {
 			ret = false;
 			break;
 		}
@@ -289,7 +309,7 @@ static bool add_patterns_from_file(pfgrep *state, const char *path)
 
 int main(int argc, char **argv)
 {
-	auto state = pfgrep();
+	pfgrep state;
 
 	// TODO: Decide to warn the user if JIT is disabled, or if JIT is on but
 	// the expression couldn't be compiled. For now, silently ignore errors.
@@ -308,7 +328,7 @@ int main(int argc, char **argv)
 			state.quiet = true; // Implied
 			break;
 		case 'e':
-			if (!add_pattern(&state, optarg)) {
+			if (!state.add_pattern(optarg)) {
 				return 4;
 			}
 			break;
@@ -316,7 +336,7 @@ int main(int argc, char **argv)
 			state.fixed = true;
 			break;
 		case 'f':
-			if (!add_patterns_from_file(&state, optarg)) {
+			if (!state.add_patterns_from_file(optarg)) {
 				return 4;
 			}
 			break;
@@ -389,7 +409,7 @@ int main(int argc, char **argv)
 
 	if (need_pattern_arg) {
 		char *expr = strdup(argv[optind++]);
-		if (!add_pattern(&state, expr)) {
+		if (!state.add_pattern(expr)) {
 			return 4;
 		}
 	}
@@ -414,16 +434,6 @@ int main(int argc, char **argv)
 			any_error = true;
 		}
 	}
-
-#ifdef DEBUG
-	// This deinitialization may be unnecessary, do it for future use of
-	// sanitizers/*grind when available on i
-	free_cached_iconv();
-	pcre2_match_data_free(state.match_data);
-	free_cached_record_sizes();
-	free(state.read_buffer);
-	free(state.conv_buffer);
-#endif
 
 	return any_error ? 2 : (any_match ? 0 : 1);
 }

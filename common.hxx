@@ -30,6 +30,7 @@ typedef struct pfgrep_file {
 class pfbase {
 public:
 	pfbase();
+	~pfbase();
 	void print_version(const char *tool_name);
 	virtual int do_action(File *file) = 0;
 	int do_thing(const char *filename, bool from_recursion);
@@ -75,7 +76,6 @@ int filename_to_libobj(File *file);
 
 /* rcdfmt.c */
 int get_pf_info(File *file);
-void free_cached_record_sizes(void);
 
 /* mbrinfo.c */
 bool get_member_info(File *file);
