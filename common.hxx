@@ -36,26 +36,26 @@ public:
 	int do_thing(const char *filename, bool from_recursion);
 
 	/* Cached system info */
-	int pase_ccsid;
+	int pase_ccsid = 0;
 	/* Files */
-	int file_count;
+	int file_count = 0;
 	/* Buffers */
-	char *read_buffer;
-	size_t read_buffer_size;
-	char *conv_buffer;
-	size_t conv_buffer_size;
+	char *read_buffer = nullptr;
+	size_t read_buffer_size = 0;
+	char *conv_buffer = nullptr;
+	size_t conv_buffer_size = 0;
 	/* Options */
-	bool search_non_source_files : 1;
-	bool dont_trim_ending_whitespace : 1;
+	bool search_non_source_files = false;
+	bool dont_trim_ending_whitespace = false;
 	// Note quiet does not imply silent et vice versa
-	bool quiet : 1; // No output on successful match
-	bool silent : 1; // No output on errors
-	bool recurse : 1;
-	bool print_matching_files : 1;
-	bool print_nonmatching_files : 1;
-	bool print_count : 1;
+	bool quiet = false; // No output on successful match
+	bool silent = false; // No output on errors
+	bool recurse = false;
+	bool print_matching_files = false;
+	bool print_nonmatching_files = false;
+	bool print_count = false;
 	/* Stat options */
-	bool dont_read_file : 1;
+	bool dont_read_file = false;
 private:
 	bool read_records(File *file, iconv_t conv);
 	bool read_streamfile(File *file, iconv_t conv);

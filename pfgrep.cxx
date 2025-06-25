@@ -61,20 +61,20 @@ public:
 
 	/* Pattern */
 	std::vector<std::unique_ptr<Pattern>> patterns;
-	pcre2_match_data *match_data;
-	uint32_t biggest_capture_count;
-	bool can_jit : 1;
+	pcre2_match_data *match_data = nullptr;
+	uint32_t biggest_capture_count = 0;
+	bool can_jit = false;
 	/* Options */
-	bool case_insensitive : 1;
-	bool always_print_filename : 1;
-	bool never_print_filename : 1;
-	bool print_line_numbers : 1;
-	bool invert : 1;
-	bool match_word : 1;
-	bool match_line : 1;
-	bool fixed : 1;
-	int max_matches;
-	int after_lines;
+	bool case_insensitive = false;
+	bool always_print_filename = false;
+	bool never_print_filename = false;
+	bool print_line_numbers = false;
+	bool invert = false;
+	bool match_word = false;
+	bool match_line = false;
+	bool fixed = false;
+	int max_matches = 0;
+	int after_lines = 0;
 
 private:
 	uint32_t get_compile_flags();
