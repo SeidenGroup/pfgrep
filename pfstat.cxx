@@ -36,9 +36,7 @@ static void usage(char *argv0)
 
 int pfstat::do_action(File *file)
 {
-	if (file->record_length != 0) {
-		get_member_info(file);
-	} else {
+	if (file->record_length == 0) {
 		// Better off using i.e. stat
 		if (this->silent) {
 			fprintf(stderr, "%s: Not a member\n",

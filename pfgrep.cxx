@@ -25,8 +25,10 @@ extern "C" {
 #include "errc.h"
 }
 
+#include <deque>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "common.hxx"
@@ -75,6 +77,7 @@ public:
 	bool fixed = false;
 	int max_matches = 0;
 	int after_lines = 0;
+	unsigned int before_lines = 0;
 
 private:
 	uint32_t get_compile_flags();
@@ -107,8 +110,8 @@ void pfgrep::print_version(const char *tool_name)
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-A num] [-m matches] [-cFHhiLlnpqrstwVvx] pattern files...\n", argv0);
-	fprintf(stderr, "usage: %s [-A num] [-m matches] [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
+	fprintf(stderr, "usage: %s [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnpqrstwVvx] pattern files...\n", argv0);
+	fprintf(stderr, "usage: %s [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
 }
 
 uint32_t pfgrep::get_compile_flags()
@@ -164,6 +167,7 @@ int pfgrep::do_action(File *file)
 	int lineno = 0;
 	int current_after_lines = 0;
 	char *line = this->conv_buffer, *next = NULL;
+	std::deque<std::tuple<const char*, size_t, int>> before_queue;
 	// If same CCSID, use read buffer, otherwise if EBCDIC/diff ASCII, conv
 	if (file->ccsid == this->pase_ccsid) {
 		line = this->read_buffer;
@@ -214,11 +218,26 @@ int pfgrep::do_action(File *file)
 		} else if ((matched && !this->invert) || (!matched && this->invert)) {
 			matches++;
 			current_after_lines = this->after_lines;
+
+			// Drain the queue of before items
+			for (const auto& queued_line : before_queue) {
+				print_line(file, std::get<0>(queued_line),
+					std::get<1>(queued_line),
+					std::get<2>(queued_line));
+			}
+			before_queue.clear();
+
 			if (!print_line(file, line, conv_size, lineno)) {
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
 			print_line(file, line, conv_size, lineno);
+		} else if (this->before_lines) {
+			// Push into the queue; make sure we don't go over
+			before_queue.push_back({line, conv_size, lineno});
+			if (before_queue.size() > this->before_lines) {
+				before_queue.pop_front();
+			}
 		}
 
 		if (this->max_matches > 0 && matches >= this->max_matches) {
@@ -318,10 +337,17 @@ int main(int argc, char **argv)
 	state.can_jit = can_jit;
 
 	int ch;
-	while ((ch = getopt(argc, argv, "A:ce:Ff:HhLlim:npqrstwVvx")) != -1) {
+	while ((ch = getopt(argc, argv, "A:B:C:ce:Ff:HhLlim:npqrstwVvx")) != -1) {
 		switch (ch) {
 		case 'A':
 			state.after_lines = atoi(optarg);
+			break;
+		case 'B':
+			state.before_lines = atoi(optarg);
+			break;
+		case 'C':
+			state.after_lines = atoi(optarg);
+			state.before_lines = state.after_lines;
 			break;
 		case 'c':
 			state.print_count = true;

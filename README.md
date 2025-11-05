@@ -188,6 +188,8 @@ For information on PCRE regex syntax, consult [PCRE docs][pcre2syntax].
 The flags that can be passed are:
 
 * `-A`: Prints the number of lines specified until the end of file or another match.
+* `-B`: Prints the number of previous lines specified until the beginning of file or another match.
+* `-C`: Has the effect of both `-A` and `-B` being set.
 * `-c`: Counts the matched lines in each file. Implies `-q`.
 * `-e`: Uses a pattern to match.
 * `-F`: Don't use a regular expression, match substrings literally.

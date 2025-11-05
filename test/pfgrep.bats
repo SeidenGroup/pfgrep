@@ -157,6 +157,34 @@ EOF
 EOF
 }
 
+@test "content lines before" {
+	run pfgrep -B 3 -n 'FOO' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+
+	assert_output - <<EOF
+5:AB
+6:ABC
+7:DEF
+8:FOO BAR
+9:FOOBAR
+10:FOOBAR FOO
+EOF
+}
+
+@test "content lines combined" {
+	run pfgrep -C 3 -n '^AB$' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+
+	assert_output - <<EOF
+1:ABC
+2:AB
+3:
+4:A
+5:AB
+6:ABC
+7:DEF
+8:FOO BAR
+EOF
+}
+
 @test "reading EBCDIC streamfile" {
 	run pfgrep -Fn 'AB' "$TESTSTMF_E"
 

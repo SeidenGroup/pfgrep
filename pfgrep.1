@@ -9,6 +9,8 @@
 .Op Fl e Ar expression
 .Op Fl f Ar expression-file
 .Op Fl A Ar num
+.Op Fl B Ar num
+.Op Fl C Ar num
 .Op Fl m Ar num
 .Op Fl ceFHhiLlnpqrstwVvx
 .Op Ar expression
@@ -40,6 +42,17 @@ The options are as follows:
 Prints the number of lines as specified by
 .Ar num ,
 until the end of the file or another match.
+.It Fl B Ar num
+Prints the number of lines as specified by
+.Ar num
+before the match, up until a previous match or the beginning of the file.
+.It Fl C Ar num
+Has the effect of both
+.Fl A
+and
+.Fl C
+being set at the same time with
+.Ar num .
 .It Fl c
 Counts the matched lines in each file. Implies the
 .Fl q
