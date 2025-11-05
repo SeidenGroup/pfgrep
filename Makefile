@@ -8,8 +8,6 @@ TESTLIB := pfgreptest
 # Can be overriden for your own PCRE2 or json-c build
 PCRE2_CFLAGS := $(shell pkg-config --cflags libpcre2-8)
 PCRE2_LDFLAGS := $(shell pkg-config --libs libpcre2-8)
-JSONC_CFLAGS := $(shell pkg-config --cflags json-c)
-JSONC_LDFLAGS := $(shell pkg-config --libs json-c)
 ZIP_CFLAGS := $(shell pkg-config --cflags libzip)
 ZIP_LDFLAGS := $(shell pkg-config --libs libzip)
 
@@ -17,15 +15,18 @@ ZIP_LDFLAGS := $(shell pkg-config --libs libzip)
 # build with optimizations for release builds.
 ifdef DEBUG
 CFLAGS := -std=gnu11 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
+CXXFLAGS := -std=c++14 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
 LDFLAGS := -g -O0
 else
 CFLAGS := -std=gnu11 -Wall -Wextra -O2
+CXXFLAGS := -std=c++14 -Wall -Wextra -O2
 LDFLAGS := -O2
 endif
 
 # Use gcc 10 from Yum if available, otherwise try regular gcc on PATH
 CC := $(shell if type gcc-10 > /dev/null 2> /dev/null; then echo gcc-10; else echo gcc; fi)
-LD := $(CC)
+CXX := $(shell if type g++-10 > /dev/null 2> /dev/null; then echo g++-10; else echo g++; fi)
+LD := $(CXX)
 AR := ar
 
 .PHONY: all clean install dist check
@@ -36,19 +37,22 @@ libpf.a: common.o conv.o errc.o convpath.o rcdfmt.o mbrinfo.o
 	$(AR) -X64 cru $@ $^
 
 pfgrep: pfgrep.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfcat: pfcat.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfstat: pfstat.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfzip: pfzip.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(JSONC_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
-	$(CC) $(PCRE2_CFLAGS) $(JSONC_CFLAGS) $(ZIP_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+	$(CC) $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+
+%.o: %.cxx
+	$(CXX) $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 clean:
 	rm -f *.o *.a pfgrep pfcat pfstat pfcat core

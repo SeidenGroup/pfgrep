@@ -9,7 +9,9 @@
 #include <stdio.h>
 #include <os400msg.h>
 
-#include "common.h"
+#include </QOpenSys/usr/include/iconv.h>
+iconv_t get_iconv(uint16_t ccsid);
+
 #include "errc.h"
 
 static bool

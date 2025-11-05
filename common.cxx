@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+extern "C" {
 #include <as400_protos.h>
 #include <as400_types.h>
 #include <dirent.h>
@@ -19,56 +20,48 @@
 #include <unistd.h>
 
 #include </QOpenSys/usr/include/iconv.h>
-#include <linkhash.h>
 
-#include "common.h"
 #include "errc.h"
+}
 
-void print_version(const char *tool_name)
+#include "common.hxx"
+
+void pfbase::print_version(const char *tool_name)
 {
 	fprintf(stderr, "%s " PFGREP_VERSION "\n", tool_name);
-	fprintf(stderr, "\tusing json-c %s\n", json_c_version());
-	fprintf(stderr, "\tusing libzip %s\n", zip_libzip_version());
-	char pcre2_ver[256], pcre2_jit[256];
-	uint32_t pcre2_can_jit = 0;
-	pcre2_config(PCRE2_CONFIG_JIT, &pcre2_can_jit);
-	pcre2_config(PCRE2_CONFIG_VERSION, pcre2_ver);
-	fprintf(stderr, "\tusing PCRE2 %s", pcre2_ver);
-	if (pcre2_can_jit) {
-		pcre2_config(PCRE2_CONFIG_JITTARGET, pcre2_jit);
-		fprintf(stderr, " (JIT target: %s)\n", pcre2_jit);
-	} else {
-		fprintf(stderr, " (no JIT)\n");
-	}
-	fprintf(stderr, "\nCopyright (c) Seiden Group 2024-2025\n");
+	fprintf(stderr, "Copyright (c) Seiden Group 2024-2025\n");
 	fprintf(stderr, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n");
 	fprintf(stderr, "Written by Calvin Buckley and others, see <https://github.com/SeidenGroup/pfgrep/graphs/contributors>\n");
 }
 
-void common_init(pfgrep *state)
+pfbase::pfbase()
 {
-	// The default hashing algorithm linkhash uses is fine, but since we
-	// deal with 20 character strings with few allowed characters, it
-	// should be safe to use the simpler "Perl-like" hash, which is a bit
-	// faster than the default.
-	json_global_set_string_hash(JSON_C_STR_HASH_PERLLIKE);
-
-	state->pase_ccsid = Qp2paseCCSID();
+	this->pase_ccsid = Qp2paseCCSID();
 }
 
+pfbase::~pfbase()
+{
+#ifdef DEBUG
+	// This deinitialization may be unnecessary, do it for future use of
+	// sanitizers/*grind when available on i
+	free_cached_iconv();
+	free(this->read_buffer);
+	free(this->conv_buffer);
+#endif
+}
 
-static bool read_records(pfgrep *state, File *file, iconv_t conv)
+bool pfbase::read_records(File *file, iconv_t conv)
 {
 	size_t read_buf_size = file->file_size + 1;
-	if (read_buf_size > state->read_buffer_size) {
-		state->read_buffer = realloc(state->read_buffer, read_buf_size);
-		state->read_buffer_size = read_buf_size;
+	if (read_buf_size > this->read_buffer_size) {
+		this->read_buffer = (char*)realloc(this->read_buffer, read_buf_size);
+		this->read_buffer_size = read_buf_size;
 	}
 	int bytes_to_read = file->file_size;
 	// Read the whole file in
-	while ((bytes_to_read = read(file->fd, state->read_buffer, bytes_to_read)) != 0) {
+	while ((bytes_to_read = read(file->fd, this->read_buffer, bytes_to_read)) != 0) {
 		if (bytes_to_read == -1) {
-			if (!state->silent) {
+			if (!this->silent) {
 				char msg[256 + PATH_MAX];
 				snprintf(msg, sizeof(msg), "read(%s, %d)", file->filename, bytes_to_read);
 				perror_xpf(msg);
@@ -76,7 +69,7 @@ static bool read_records(pfgrep *state, File *file, iconv_t conv)
 			return false;
 		}
 	}
-	state->read_buffer[file->file_size] = '\0';
+	this->read_buffer[file->file_size] = '\0';
 
 	size_t record_count = file->record_count;
 	if (record_count <= 0) {
@@ -84,14 +77,14 @@ static bool read_records(pfgrep *state, File *file, iconv_t conv)
 	}
 	// record length * 6 for worst case UTF-8 conv + newline
 	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + record_count + 1;
-	if (conv_buf_size > state->conv_buffer_size) {
-		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
-		state->conv_buffer_size = conv_buf_size;
+	if (conv_buf_size > this->conv_buffer_size) {
+		this->conv_buffer = (char*)realloc(this->conv_buffer, conv_buf_size);
+		this->conv_buffer_size = conv_buf_size;
 	}
-	char *out = state->conv_buffer;
+	char *out = this->conv_buffer;
 	size_t outleft = conv_buf_size;
 	for (size_t record_num = 0; record_num < record_count; record_num++) {
-		char *record = state->read_buffer + (record_num * file->record_length);
+		char *record = this->read_buffer + (record_num * file->record_length);
 		// Converted record is on a 6x multiplier due to possible
 		// worst case EBCDIC->UTF-8 conversion
 		char *in = record;
@@ -105,7 +98,7 @@ static bool read_records(pfgrep *state, File *file, iconv_t conv)
 		// Trim buffer to end of iconv plus trim spaces,
 		// as SRCPFs are fixed length and space padded,
 		// so $ works like expected
-		if (!state->dont_trim_ending_whitespace) {
+		if (!this->dont_trim_ending_whitespace) {
 			while (out >= beginning && *(out - 1) == ' ') {
 				*out-- = '\0';
 				outleft++;
@@ -120,25 +113,25 @@ static bool read_records(pfgrep *state, File *file, iconv_t conv)
 	return true;
 }
 
-static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
+bool pfbase::read_streamfile(File *file, iconv_t conv)
 {
 	size_t read_buf_size = file->file_size + 1;
-	if (read_buf_size > state->read_buffer_size) {
-		state->read_buffer = realloc(state->read_buffer, read_buf_size);
-		state->read_buffer_size = read_buf_size;
+	if (read_buf_size > this->read_buffer_size) {
+		this->read_buffer = (char*)realloc(this->read_buffer, read_buf_size);
+		this->read_buffer_size = read_buf_size;
 	}
 	int bytes_to_read = file->file_size;
 	size_t record_count = file->file_size;
 	// Assume max length plus newline character for each line
 	size_t conv_buf_size = read_buf_size + record_count;
-	if (conv_buf_size > state->conv_buffer_size) {
-		state->conv_buffer = realloc(state->conv_buffer, conv_buf_size);
-		state->conv_buffer_size = conv_buf_size;
+	if (conv_buf_size > this->conv_buffer_size) {
+		this->conv_buffer = (char*)realloc(this->conv_buffer, conv_buf_size);
+		this->conv_buffer_size = conv_buf_size;
 	}
 	// Read the whole file in
-	while ((bytes_to_read = read(file->fd, state->read_buffer, bytes_to_read)) != 0) {
+	while ((bytes_to_read = read(file->fd, this->read_buffer, bytes_to_read)) != 0) {
 		if (bytes_to_read == -1) {
-			if (!state->silent) {
+			if (!this->silent) {
 				char msg[256 + PATH_MAX];
 				snprintf(msg, sizeof(msg), "read(%s, %d)", file->filename, bytes_to_read);
 				perror_xpf(msg);
@@ -146,18 +139,18 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 			return false;
 		}
 	}
-	state->read_buffer[file->file_size] = '\0';
+	this->read_buffer[file->file_size] = '\0';
 
 	// Skip the copy, we'll just work against the read buffer directly.
 	// Save an unnecessary iconv and conversion.
-	if (file->ccsid == state->pase_ccsid) {
-		state->conv_buffer[0] = '\0';
+	if (file->ccsid == this->pase_ccsid) {
+		this->conv_buffer[0] = '\0';
 		return true;
 	}
 
-	char *in = state->read_buffer;
+	char *in = this->read_buffer;
 	size_t inleft = file->file_size;
-	char *out = state->conv_buffer;
+	char *out = this->conv_buffer;
 	size_t outleft = conv_buf_size;
 	int rc = iconv(conv, &in, &inleft, &out, &outleft);
 	if (rc != 0) {
@@ -173,13 +166,13 @@ static bool read_streamfile(pfgrep *state, File *file, iconv_t conv)
 /**
  * Recurse through a directory or physical file.
  */
-static int do_directory(pfgrep *state, const char *directory)
+int pfbase::do_directory(const char *directory)
 {
 	char msg[PATH_MAX + 256];
 	int files_matched = 0;
 	DIR *dir = opendir(directory);
 	if (dir == NULL) {
-		if (!state->silent) {
+		if (!this->silent) {
 			snprintf(msg, sizeof(msg), "opendir(%s)", directory);
 			perror_xpf(msg);
 		}
@@ -193,7 +186,7 @@ static int do_directory(pfgrep *state, const char *directory)
 
 		// Raise the file count in case single dir/PF passed,
 		// so filenames of subdirectories are printed
-		state->file_count++;
+		this->file_count++;
 
 		// XXX: Technically on i, it might be faster to chdir rather
 		// than use a full path, since resolution is faster from CWD
@@ -205,14 +198,14 @@ static int do_directory(pfgrep *state, const char *directory)
 		} else {
 			snprintf(full_path, sizeof(full_path), "%s/%s", directory, dirent->d_name);
 		}
-		int ret = do_thing(state, full_path, true);
+		int ret = do_thing(full_path, true);
 		if (ret > 0) {
 			files_matched += ret;
 		}
 		errno = 0; // Don't let i.e. iconv errors influence the next call
 	}
 	if (errno != 0) {
-		if (!state->silent) {
+		if (!this->silent) {
 			snprintf(msg, sizeof(msg), "reading dirent in %s", directory);
 			perror_xpf(msg);
 		}
@@ -221,13 +214,13 @@ static int do_directory(pfgrep *state, const char *directory)
 	return files_matched;
 }
 
-static bool set_record_length(pfgrep *state, File *file)
+bool pfbase::set_record_length(File *file)
 {
 	// Determine the record length, the API to do this needs traditional paths.
 	// Note that it will resolve symlinks for us, so i.e. /QIBM/include works
 	int ret = filename_to_libobj(file);
 	if (ret == -1) {
-		if (!state->silent) {
+		if (!this->silent) {
 			fprintf(stderr, "filename_to_libobj(%s): Failed to convert IFS path to object name\n",
 				file->filename);
 		}
@@ -238,12 +231,12 @@ static bool set_record_length(pfgrep *state, File *file)
 		// Ignore files we can't support w/ POSIX I/O for now
 		return false;
 	} else if (file_record_size == 0) {
-		if (!state->silent) {
+		if (!this->silent) {
 			fprintf(stderr, "get_pf_info(%s): Couldn't get record length\n",
 				file->filename);
 		}
 		return false;
-	} else if (file_record_size < 0 && state->search_non_source_files) {
+	} else if (file_record_size < 0 && this->search_non_source_files) {
 		// Non-source PF, signedness is used as source PF bit
 		file->record_length = -file_record_size;
 		return true;
@@ -256,7 +249,7 @@ static bool set_record_length(pfgrep *state, File *file)
 	return false;
 }
 
-static int do_file(pfgrep *state, File *file)
+int pfbase::do_file(File *file)
 {
 	char msg[PATH_MAX + 256];
 	int matches = -1;
@@ -268,7 +261,7 @@ static int do_file(pfgrep *state, File *file)
 	// We let do_file fill in the filename and CCSID. Technically a TOCTOU
 	// problem, but open(2) error reporting with IBM i objects is goofy.
 	if (file->fd == -1) {
-		if (!state->silent) {
+		if (!this->silent) {
 			snprintf(msg, sizeof(msg), "open(%s)", filename);
 			perror_xpf(msg);
 		}
@@ -277,7 +270,7 @@ static int do_file(pfgrep *state, File *file)
 
 	// Get member info for an accurate record count
 	if (file->record_length != 0) {
-		if (!get_member_info(file) && !state->silent) {
+		if (!get_member_info(file) && !this->silent) {
 			snprintf(msg, sizeof(msg), "get_member_info(%s)", file->filename);
 			perror(msg);
 		}
@@ -286,38 +279,38 @@ static int do_file(pfgrep *state, File *file)
 	// Open a conversion for this CCSID
 	conv = get_iconv(file->ccsid);
 	if (conv == (iconv_t)(-1)) {
-		if (!state->silent) {
+		if (!this->silent) {
 			snprintf(msg, sizeof(msg), "iconv_open(%d, %d)", Qp2paseCCSID(), file->ccsid);
 			perror(msg);
 		}
 		goto fail;
 	}
 
-	if (!state->dont_read_file) {
+	if (!this->dont_read_file) {
 		// Streamfiles are record length 0, and must be read differently
 		if (file->record_length == 0) {
-			if (!read_streamfile(state, file, conv)) {
+			if (!read_streamfile(file, conv)) {
 				goto fail;
 			}
 		} else {
-			if (!read_records(state, file, conv)) {
+			if (!read_records(file, conv)) {
 				goto fail;
 			}
 		}
 	}
-	matches = do_action(state, file);
+	matches = do_action(file);
 
-	if (matches == 0 && state->print_nonmatching_files) {
+	if (matches == 0 && this->print_nonmatching_files) {
 		printf("%s\n", filename);
-	} else if (matches > 0 && state->print_matching_files) {
+	} else if (matches > 0 && this->print_matching_files) {
 		printf("%s\n", filename);
 	}
-	if (state->print_count) {
+	if (this->print_count) {
 		printf("%s:%d\n", filename, matches);
 	}
 
 fail:
-	// shift state should be reset after each file in case of MBCS/DBCS
+	// shift this should be reset after each file in case of MBCS/DBCS
 	if (conv != (iconv_t)(-1)) {
 		reset_iconv(conv);
 	}
@@ -328,18 +321,18 @@ fail:
 	return matches;
 }
 
-int do_thing(pfgrep *state, const char *filename, bool from_recursion)
+int pfbase::do_thing(const char *filename, bool from_recursion)
 {
 	char msg[PATH_MAX + 256];
 	int matches = 0;
-	struct stat64_ILE s = {0};
-	File f = {0};
+	struct stat64_ILE s = {};
+	File f = {};
 
 	f.filename = filename;
 	// IBM messed up the statx declaration, it doesn't write
 	int ret = statx((char*)filename, (struct stat*)&s, sizeof(s), STX_XPFSS_PASE);
 	if (ret == -1) {
-		if (!state->silent) {
+		if (!this->silent) {
 			snprintf(msg, sizeof(msg), "stat(%s)", filename);
 			perror_xpf(msg);
 		}
@@ -350,13 +343,13 @@ int do_thing(pfgrep *state, const char *filename, bool from_recursion)
 	f.mtime = s.st_mtime;
 	// objtype is *FILE or *DIR, check for mode though to avoid i.e. SAVFs
 	if (S_ISDIR(s.st_mode)) {
-		if (state->recurse) {
-			int subdir_files_matched = do_directory(state, filename);
+		if (this->recurse) {
+			int subdir_files_matched = do_directory(filename);
 			if (subdir_files_matched >= 0) {
 				matches += subdir_files_matched;
 			}
 		} else {
-			if (!state->silent) {
+			if (!this->silent) {
 				fprintf(stderr, "stat(%s): Is a directory or physical file\n", filename);
 			}
 			return -1;
@@ -368,14 +361,14 @@ int do_thing(pfgrep *state, const char *filename, bool from_recursion)
 		return 0;
 	} else if (strcmp(s.st_objtype, "*MBR      ") == 0) {
 		f.ccsid = s.st_ccsid; // or st_codepage?
-		if (!set_record_length(state, &f)) {
+		if (!set_record_length(&f)) {
 			return from_recursion ? 0 : -1; // messages emited in function
 		}
-		matches = do_file(state, &f);
+		matches = do_file(&f);
 	} else if (strcmp(s.st_objtype, "*STMF     ") == 0) {
 		f.ccsid = s.st_ccsid; // or st_codepage?
 		f.record_length = 0;
-		matches = do_file(state, &f);
+		matches = do_file(&f);
 	}
 	// XXX: Message for non-PF/members?
 	return matches;

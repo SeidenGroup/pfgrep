@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+extern "C" {
 #include <as400_protos.h>
 #include <as400_types.h>
 #include <dirent.h>
@@ -20,9 +21,28 @@
 #include <unistd.h>
 
 #include <zip.h>
+}
 
-#include "common.h"
+#include "common.hxx"
 #include "errc.h"
+
+class pfzip : public pfbase {
+public:
+	int do_action(File *file) override;
+	void print_version(const char *tool_name);
+
+	/* Archive */
+	zip_t *archive;
+	/* Archive options */
+	bool overwrite : 1;
+	bool dont_replace_extension : 1;
+};
+
+void pfzip::print_version(const char *tool_name)
+{
+	pfbase::print_version(tool_name);
+	fprintf(stderr, "\tusing libzip %s\n", zip_libzip_version());
+}
 
 static void usage(char *argv0)
 {
@@ -77,37 +97,33 @@ static void normalize_path(char *output, size_t output_size, File *file, bool re
 	strncpy(output, input, output_size);
 }
 
-int do_action(pfgrep *state, File *file)
+int pfzip::do_action(File *file)
 {
+	zip_int64_t index = -1;
 	int ret = 1, nonfatal_ret;
-	const char *buf = state->conv_buffer;
-	if (file->record_length == 0 && file->ccsid == state->pase_ccsid) {
-		buf = state->read_buffer;
+	const char *buf = this->conv_buffer;
+	if (file->record_length == 0 && file->ccsid == this->pase_ccsid) {
+		buf = this->read_buffer;
 	}
 	size_t len = strlen(buf);
 	// we must keep a copy around until zip_close, and we reread the buffer
 	// therefore make a copy (NBD) and tell libzip to free (last parm)
 	char *buf_copy = strdup(buf);
-	zip_source_t *s = zip_source_buffer(state->archive, buf_copy, len, 1);
-	if (s == NULL && !state->silent) {
+	zip_source_t *s = zip_source_buffer(this->archive, buf_copy, len, 1);
+	if (s == NULL && !this->silent) {
 		fprintf(stderr, "zip_source_buffer(%s): %s\n",
 			file->filename,
-			zip_strerror(state->archive));
-		ret = -1;
+			zip_strerror(this->archive));
 		goto fail;
 	}
 
 	char path[PATH_MAX + 1];
-	// We'll need the member metadata for the comment and extension.
-	if (file->record_length != 0) {
-		get_member_info(file);
-	}
-	normalize_path(path, sizeof(path), file, !state->dont_replace_extension);
-	zip_int64_t index = zip_file_add(state->archive, path, s, 0);
-	if (index == -1 && !state->silent) {
+	normalize_path(path, sizeof(path), file, !this->dont_replace_extension);
+	index = zip_file_add(this->archive, path, s, 0);
+	if (index == -1 && !this->silent) {
 		fprintf(stderr, "zip_file_add(%s): %s\n",
 			file->filename,
-			zip_strerror(state->archive));
+			zip_strerror(this->archive));
 		zip_source_free(s);
 		ret = -1;
 		goto fail;
@@ -129,13 +145,13 @@ int do_action(pfgrep *state, File *file)
 			file->ccsid);
 	}
 	// not critical if these fail, but do warn
-	nonfatal_ret = zip_file_set_comment(state->archive, index, comment, strlen(comment), 0);
-	if (nonfatal_ret && !state->silent) {
+	nonfatal_ret = zip_file_set_comment(this->archive, index, comment, strlen(comment), 0);
+	if (nonfatal_ret && !this->silent) {
 		fprintf(stderr, "zip_file_set_comment: Can't set comment for %s",
 			file->filename);
 	}
-	nonfatal_ret = zip_file_set_mtime(state->archive, index, file->mtime, 0);
-	if (nonfatal_ret && !state->silent) {
+	nonfatal_ret = zip_file_set_mtime(this->archive, index, file->mtime, 0);
+	if (nonfatal_ret && !this->silent) {
 		fprintf(stderr, "zip_file_set_comment: Can't set modification time (%zd) for %s",
 			file->mtime,
 			file->filename);
@@ -146,8 +162,7 @@ fail:
 
 int main(int argc, char **argv)
 {
-	pfgrep state = {0};
-	common_init(&state);
+	auto state = pfzip();
 
 	int ch;
 	while ((ch = getopt(argc, argv, "EprstWV")) != -1) {
@@ -171,7 +186,7 @@ int main(int argc, char **argv)
 			state.overwrite = true;
 			break;
 		case 'V':
-			print_version("pfzip");
+			state.print_version("pfzip");
 			return 0;
 		default:
 			usage(argv[0]);
@@ -207,7 +222,7 @@ int main(int argc, char **argv)
 
 	bool any_match = false, any_error = false;
 	for (int i = optind; i < argc; i++) {
-		int ret = do_thing(&state, argv[i], false);
+		int ret = state.do_thing(argv[i], false);
 		if (ret > 0) {
 			any_match = true;
 		} else if (ret < 0) {
@@ -219,14 +234,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "zip_close: %s\n", zip_strerror(state.archive));
 		return 4;
 	}
-#ifdef DEBUG
-	// This deinitialization may be unnecessary, do it for future use of
-	// sanitizers/*grind when available on i
-	free_cached_iconv();
-	free_cached_record_sizes();
-	free(state.read_buffer);
-	free(state.conv_buffer);
-#endif
 
 	return any_error ? 2 : (any_match ? 0 : 1);
 }
