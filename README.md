@@ -53,7 +53,7 @@ cd pfgrep
 Install necessary dependencies:
 
 ```shell
-yum install json-c-devel pcre2-devel libzip-devel pkg-config make-gnu gcc gcc-cplusplus
+yum install pcre2-devel libzip-devel pkg-config make-gnu gcc gcc-cplusplus
 # Needed on IBM i 7.4 or newer, older GCC can't handle newer versions' headers
 yum install gcc-10 gcc-cplusplus-10
 ```

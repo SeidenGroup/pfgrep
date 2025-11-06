@@ -9,8 +9,9 @@ URL: https://github.com/SeidenGroup/pfgrep
 Source: pfgrep-%{version}.tar.gz
 
 BuildRequires: gcc
+BuildRequires: gcc-cplusplus
+BuildRequires: libstdcplusplus-devel
 BuildRequires: make-gnu
-BuildRequires: json-c-devel
 BuildRequires: pcre2-devel
 BuildRequires: libzip-devel
 BuildRequires: pkg-config
