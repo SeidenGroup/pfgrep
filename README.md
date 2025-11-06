@@ -191,6 +191,7 @@ The flags that can be passed are:
 * `-B`: Prints the number of previous lines specified until the beginning of file or another match.
 * `-C`: Has the effect of both `-A` and `-B` being set.
 * `-c`: Counts the matched lines in each file. Implies `-q`.
+* `-d`: Search for text member descriptions in physical files. Descriptions will be shown as line 0.
 * `-e`: Uses a pattern to match.
 * `-F`: Don't use a regular expression, match substrings literally.
 * `-f`: Reads patterns from a stream file, each on their own line. Use `-` for standard input.

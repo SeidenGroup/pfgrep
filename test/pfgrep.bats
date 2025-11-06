@@ -13,7 +13,7 @@ setup_file() {
 	# Install test fixtures
 	system crtlib "$TESTLIB"
 	system crtsrcpf "$TESTLIB/qtxtsrc"
-	system addpfm "$TESTLIB/qtxtsrc" abc
+	system addpfm "$TESTLIB/qtxtsrc" abc "text('description')"
 	Rfile -w "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" <<EOF
 ABC
 AB
@@ -182,6 +182,14 @@ EOF
 6:ABC
 7:DEF
 8:FOO BAR
+EOF
+}
+
+@test "search descriptions" {
+	run pfgrep -n -d "description" "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+
+	assert_output - << EOF
+0:description
 EOF
 }
 

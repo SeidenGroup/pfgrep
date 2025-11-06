@@ -75,6 +75,7 @@ public:
 	bool match_word = false;
 	bool match_line = false;
 	bool fixed = false;
+	bool search_descriptions = false;
 	int max_matches = 0;
 	int after_lines = 0;
 	unsigned int before_lines = 0;
@@ -83,6 +84,7 @@ private:
 	uint32_t get_compile_flags();
 	uint32_t get_extra_compile_flags();
 	bool print_line(File *file, const char *line, size_t line_size, int lineno);
+	int try_patterns(const char *line, size_t line_size);
 };
 
 pfgrep::~pfgrep()
@@ -160,10 +162,35 @@ bool pfgrep::print_line(File *file, const char *line, size_t line_size, int line
 	return true;
 }
 
+int pfgrep::try_patterns(const char *line, size_t line_size)
+{
+	uint32_t offset = 0, flags = 0;
+	int rc = 0;
+	// We can have multiple expressions. Find the first match.
+	for (const auto& pattern : this->patterns) {
+		pcre2_code *re = pattern->re;
+
+		// As long as we checked that the pattern successfully was JIT
+		// compiled, it should be safe to use pcre2_jit_match instead.
+		if (this->can_jit) {
+			rc = pcre2_jit_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
+		} else {
+			rc = pcre2_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
+		}
+
+		if (rc > 0) {
+			break;
+		} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
+			// handle error after the loop
+			break;
+		}
+	}
+	return rc;
+}
+
 int pfgrep::do_action(File *file)
 {
 	int matches = 0, rc = 0;
-	uint32_t offset = 0, flags = 0;
 	int lineno = 0;
 	int current_after_lines = 0;
 	char *line = this->conv_buffer, *next = NULL;
@@ -172,6 +199,23 @@ int pfgrep::do_action(File *file)
 	if (file->ccsid == this->pase_ccsid) {
 		line = this->read_buffer;
 	}
+
+	// For search descriptions (special behaviour where we match,
+	// but treat it as a non-line for i.e. context purposes)
+	if (this->search_descriptions && file->record_length > 0) {
+		size_t desc_size = strlen(file->description);
+		// Trim since we invariably have this
+		if (!this->dont_trim_ending_whitespace) {
+			while (desc_size > 0 && file->description[desc_size - 1] == ' ') {
+				desc_size--;
+			}
+		}
+		rc = try_patterns(file->description, desc_size);
+		if (rc > 0) {
+			print_line(file, file->description, desc_size, 0);
+		}
+	}
+
 	while (line && *line) {
 		bool matched = false;
 		lineno++;
@@ -188,25 +232,9 @@ int pfgrep::do_action(File *file)
 			conv_size = strlen(line);
 		}
 
-		// We can have multiple expressions. Find the first match.
-		for (const auto& pattern : this->patterns) {
-			pcre2_code *re = pattern->re;
-
-			// As long as we checked that the pattern successfully was JIT
-			// compiled, it should be safe to use pcre2_jit_match instead.
-			if (this->can_jit) {
-				rc = pcre2_jit_match(re, (PCRE2_SPTR)line, conv_size, offset, flags, this->match_data, NULL);
-			} else {
-				rc = pcre2_match(re, (PCRE2_SPTR)line, conv_size, offset, flags, this->match_data, NULL);
-			}
-
-			if (rc > 0) {
-				matched = true;
-				break;
-			} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
-				// handle error after the loop
-				break;
-			}
+		rc = try_patterns(line, conv_size);
+		if (rc > 0) {
+			matched = true;
 		}
 
 		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
@@ -337,7 +365,7 @@ int main(int argc, char **argv)
 	state.can_jit = can_jit;
 
 	int ch;
-	while ((ch = getopt(argc, argv, "A:B:C:ce:Ff:HhLlim:npqrstwVvx")) != -1) {
+	while ((ch = getopt(argc, argv, "A:B:C:cde:Ff:HhLlim:npqrstwVvx")) != -1) {
 		switch (ch) {
 		case 'A':
 			state.after_lines = atoi(optarg);
@@ -352,6 +380,9 @@ int main(int argc, char **argv)
 		case 'c':
 			state.print_count = true;
 			state.quiet = true; // Implied
+			break;
+		case 'd':
+			state.search_descriptions = true;
 			break;
 		case 'e':
 			if (!state.add_pattern(optarg)) {
