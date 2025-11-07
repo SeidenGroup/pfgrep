@@ -10,6 +10,10 @@ PCRE2_CFLAGS := $(shell pkg-config --cflags libpcre2-8)
 PCRE2_LDFLAGS := $(shell pkg-config --libs libpcre2-8)
 ZIP_CFLAGS := $(shell pkg-config --cflags libzip)
 ZIP_LDFLAGS := $(shell pkg-config --libs libzip)
+PASECPP_CFLAGS := -Iinclude/pase-cpp
+
+DEPS_CFLAGS := $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(PASECPP_CFLAGS)
+DEPS_LDFLAGS := $(PCRE2_LDFLAGS) $(ZIP_LDFLAGS)
 
 # Build with warnings as errors and symbols for developers,
 # build with optimizations for release builds.
@@ -37,25 +41,25 @@ libpf.a: common.o conv.o errc.o convpath.o rcdfmt.o mbrinfo.o
 	$(AR) -X64 cru $@ $^
 
 pfgrep: pfgrep.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfcat: pfcat.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfstat: pfstat.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfzip: pfzip.o libpf.a
-	$(LD) $(ZIP_LDFLAGS) $(PCRE2_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
+	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c
-	$(CC) $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+	$(CC) $(DEPS_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 %.o: %.cxx
-	$(CXX) $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+	$(CXX) $(DEPS_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 clean:
-	rm -f *.o *.a pfgrep pfcat pfstat pfcat core
+	rm -f *.o *.a pfgrep pfcat pfstat pfcat core *.tar *.tar.gz
 
 check: pfgrep pfcat pfzip
 	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats test/pfcat.bats test/pfzip.bats
@@ -70,7 +74,10 @@ install: all
 	install -D -m 644 pfstat.1 $(DESTDIR)$(PREFIX)/share/man/man1/pfstat.1
 	install -D -m 644 pfzip.1 $(DESTDIR)$(PREFIX)/share/man/man1/pfzip.1
 
+# This assumes git; take the root and then for each submodule staple it to the root's submodule
+# approach from https://gist.github.com/arteymix/03702e3eb05c2c161a86b49d4626d21f
 dist:
-	# This assumes git
-	# XXX: git archive doesn't support submodules, so for now, exclude tests with source tarballs
-	git archive --prefix=pfgrep-$(VERSION)/ --format=tar.gz -o pfgrep-$(VERSION).tar.gz HEAD Makefile README.md COPYING *.c *.h *.1
+	rm -f pfgrep-$(VERSION).tar.gz
+	git archive --prefix=pfgrep-$(VERSION)/ --format=tar -o pfgrep-$(VERSION).tar HEAD Makefile README.md COPYING *.c *.cxx *.h *.hxx *.1
+	git submodule foreach --recursive "git archive --prefix=pfgrep-$(VERSION)/"'$$path'"/ --output="'$$sha1'".tar HEAD && tar --concatenate --file=$(shell pwd)/pfgrep-$(VERSION).tar "'$$sha1'".tar && rm "'$$sha1'".tar"
+	gzip pfgrep-$(VERSION).tar
