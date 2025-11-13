@@ -21,6 +21,8 @@ extern "C" {
 #include "ebcdic.hxx"
 #include "pgmfunc.hxx"
 
+using namespace pase_cpp;
+
 #include <map>
 #include <string>
 

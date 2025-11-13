@@ -19,6 +19,8 @@ extern "C" {
 #include "ebcdic.hxx"
 #include "ilefunc.hxx"
 
+using namespace pase_cpp;
+
 typedef struct __attribute__((packed)) Qlg_Path_Name {
 	int  CCSID;
 	char Country_ID[2];
