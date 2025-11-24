@@ -47,7 +47,7 @@ typedef struct QSYS0100 {
 
 EF<8> QSYS0100_name("QSYS0100");
 
-static ILEFunction<void, Qlg_Path_Name_T*, QSYS0100*, const char*, unsigned int, unsigned int, ERRC0100*> Qp0lCvtPathToQSYSObjName("QSYS/QP0LLIB2", "Qp0lCvtPathToQSYSObjName");
+static ILEFunction<void, Qlg_Path_Name_T*, QSYS0100*, const char*, unsigned int, unsigned int, ERRC0100*> Qp0lCvtPathToQSYSObjName("QSYS/QP0LLIB2", "Qp0lCvtPathToQSYSObjName", ILECALL_EXCP_NOSIGNAL);
 
 /**
  * Takes an ASCII IFS path to a traditional object (like /QSYS.LIB/QGPL.LIB/QCLSRC.FILE/X.MBR)

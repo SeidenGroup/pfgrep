@@ -31,7 +31,7 @@ EF<10> _FIRST("*FIRST");
 EF<10> _FILETYPE("*FILETYPE");
 EF<10> _INT("*INT");
 
-static PGMFunction<char*, int, char*, const char*, const char*, const char*, const char, const char*, const char*, ERRC0100*> QDBRTVFD("QSYS", "QDBRTVFD");
+static PGMFunction<char*, int, char*, const char*, const char*, const char*, const char, const char*, const char*, ERRC0100*> QDBRTVFD("QSYS", "QDBRTVFD", PGMCALL_EXCP_NOSIGNAL);
 
 static std::map<std::string, int> cached_record_sizes;
 

@@ -26,7 +26,7 @@ using namespace pase_cpp;
 
 EF<8> MBRD0200("MBRD0200");
 
-static PGMFunction<char*, int, const char*, const char*, const char*, const char, ERRC0100*> QUSRMBRD("QSYS", "QUSRMBRD");
+static PGMFunction<char*, int, const char*, const char*, const char*, const char, ERRC0100*> QUSRMBRD("QSYS", "QUSRMBRD", PGMCALL_EXCP_NOSIGNAL);
 
 // assume EBCDIC
 extern "C" bool get_member_info(File *file)
