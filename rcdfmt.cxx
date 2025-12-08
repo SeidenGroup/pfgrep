@@ -26,10 +26,9 @@ using namespace pase_cpp;
 #include <map>
 #include <string>
 
-EF<8> FILD0100("FILD0100");
-EF<10> _FIRST("*FIRST");
-EF<10> _FILETYPE("*FILETYPE");
-EF<10> _INT("*INT");
+EbcdicFixedString<10> _FIRST("*FIRST");
+EbcdicFixedString<10> _FILETYPE("*FILETYPE");
+EbcdicFixedString<10> _INT("*INT");
 
 static PGMFunction<char*, int, char*, const char*, const char*, const char*, const char, const char*, const char*, ERRC0100*> QDBRTVFD("QSYS", "QDBRTVFD", PGMCALL_EXCP_NOSIGNAL);
 
@@ -58,7 +57,7 @@ extern "C" int get_pf_info(File *file)
 	ERRC0100 errc = {};
 	errc.bytes_avail = sizeof(ERRC0100);
 
-	QDBRTVFD(output, sizeof(output), output_filename, FILD0100.value, filename.data(), _FIRST.value, '1'_e, _FILETYPE.value, _INT.value, &errc);
+	QDBRTVFD(output, sizeof(output), output_filename, "FILD0100"_e, filename.data(), _FIRST, '1'_e, _FILETYPE, _INT, &errc);
 	if (errc.exception_id[0] != '\0') {
 		// XXX: Translate common messages like CPF5715 into ENOENT, etc.
 		errno = ENOSYS;

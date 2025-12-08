@@ -24,8 +24,6 @@ extern "C" {
 
 using namespace pase_cpp;
 
-EF<8> MBRD0200("MBRD0200");
-
 static PGMFunction<char*, int, const char*, const char*, const char*, const char, ERRC0100*> QUSRMBRD("QSYS", "QUSRMBRD", PGMCALL_EXCP_NOSIGNAL);
 
 // assume EBCDIC
@@ -37,7 +35,7 @@ extern "C" bool get_member_info(File *file)
 	ERRC0100 errc = {};
 	errc.bytes_avail = sizeof(ERRC0100);
 
-	QUSRMBRD(output, sizeof(output), MBRD0200.value, file->libobj, file->member, '0'_e, &errc);
+	QUSRMBRD(output, sizeof(output), "MBRD0200"_e, file->libobj, file->member, '0'_e, &errc);
 	if (errc.exception_id[0] != '\0') {
 		// XXX: Translate common messages like CPF5715 into ENOENT, etc.
 		errno = ENOSYS;

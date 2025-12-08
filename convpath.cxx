@@ -45,8 +45,6 @@ typedef struct QSYS0100 {
 	char asp_name[28];
 } QSYS0100;
 
-EF<8> QSYS0100_name("QSYS0100");
-
 static ILEFunction<void, Qlg_Path_Name_T*, QSYS0100*, const char*, unsigned int, unsigned int, ERRC0100*> Qp0lCvtPathToQSYSObjName("QSYS/QP0LLIB2", "Qp0lCvtPathToQSYSObjName", ILECALL_EXCP_NOSIGNAL);
 
 /**
@@ -68,14 +66,14 @@ extern "C" int filename_to_libobj(File *file)
 	// /QSYS.LIB/... path names are coerced to 37
 	input_qlg.qlg.CCSID = 37;
 	input_qlg.qlg.Path_Length = strlen(input_qlg.path);
-	input_qlg.qlg.Path_Name_Delimiter[0] = 0x61; // ebcdic slash
+	input_qlg.qlg.Path_Name_Delimiter[0] = '/'_e; // ebcdic slash
 
 	QSYS0100 qsys = {};
 	qsys.bytes_available = sizeof(qsys);
 	ERRC0100 errc = {};
 	errc.bytes_in = sizeof(errc);
 
-	Qp0lCvtPathToQSYSObjName(&input_qlg.qlg, &qsys, QSYS0100_name.value, sizeof(qsys), 37, (ERRC0100*)&errc);
+	Qp0lCvtPathToQSYSObjName(&input_qlg.qlg, &qsys, "QSYS0100"_e, sizeof(qsys), 37, (ERRC0100*)&errc);
 	if (errc.exception_id[0] != '\0') {
 		/* likely CPFA0DB */
 		perror_xpf("Qp0lCvtPathToQSYSObjName");
