@@ -240,7 +240,7 @@ bool pfbase::set_record_length(File *file)
 		// Non-source PF, signedness is used as source PF bit
 		file->record_length = -file_record_size;
 		return true;
-	} else {
+	} else if (file_record_size > 0) {
 		// Source PF, length includes other metadata not pulled when
 		// reading source PFs via POSIX APIs
 		file->record_length = file_record_size - 12;
