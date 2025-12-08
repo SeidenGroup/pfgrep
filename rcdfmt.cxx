@@ -68,32 +68,32 @@ extern "C" int get_pf_info(File *file)
 	// We use POSIX I/O to read record files, and this has limits:
 	// https://www.ibm.com/docs/en/i/7.5?topic=qsyslib-file-handling-restrictions-in-file-system
 
-	// Is this a logical file?
-	bool Qdbfhfpl = output[8] & 0x20;
-	if (Qdbfhfpl) {
+	// Is this a logical file? (Qdbfhfpl)
+	bool logical_file = output[8] & 0x20;
+	if (logical_file) {
 		errno = ENODEV;
 		return 0;
 	}
 
-	// Is this a source PF?
-	bool Qdbfhfsu = output[8] & 0x08;
+	// Is this a source PF? (Qdbfhfsu)
+	bool source_pf = output[8] & 0x08;
 
-	// How many fields do we have?
-	int16_t Qdbfmxfnum = *(int16_t*)(output + 206);
-	// Is this program or externally described?
+	// How many fields do we have? (Qdbfmxfnum)
+	int16_t field_count = *(int16_t*)(output + 206);
+	// Is this program or externally described? (Qdbfpgmd)
+	bool program_described = output[60] & 0x70;
 	// We can only use program described with a single field, source PFs,
 	// or externally described, since we open as binary.
-	bool Qdbfpgmd = output[60] & 0x70;
-	if (!Qdbfhfsu && (!Qdbfpgmd || Qdbfmxfnum < 2)) {
+	if (!source_pf && program_described && field_count != 1) {
 		errno = ENODEV;
 		return 0;
 	}
 
-	// Record length
-	int Qdbfmxrl = *(int16_t*)(output + 304);
+	// Record length (Qdbfmxrl)
+	int record_length = *(int16_t*)(output + 304);
 
 	// Compress return value into a single integer that's easily stored
-	int ret = Qdbfhfsu ? Qdbfmxrl : -Qdbfmxrl;
+	int ret = source_pf ? record_length : -record_length;
 
 	cached_record_sizes[filename] = ret;
 
