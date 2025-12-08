@@ -66,7 +66,7 @@ extern "C" int filename_to_libobj(File *file)
 	// /QSYS.LIB/... path names are coerced to 37
 	input_qlg.qlg.CCSID = 37;
 	input_qlg.qlg.Path_Length = strlen(input_qlg.path);
-	input_qlg.qlg.Path_Name_Delimiter[0] = '/'_e; // ebcdic slash
+	input_qlg.qlg.Path_Name_Delimiter[0] = '/'_e;
 
 	QSYS0100 qsys = {};
 	qsys.bytes_available = sizeof(qsys);
@@ -85,16 +85,15 @@ extern "C" int filename_to_libobj(File *file)
 	// Ensure filename is space and not null padded
 	for (int i = 0; i < 20; i++) {
 		if (file->libobj[i] == '\0') {
-			file->libobj[i] = 0x40; /* EBCDIC ' ' */
+			file->libobj[i] = ' '_e;
 		}
 	}
-	// Null terminate for json-c
 	file->libobj[20] = '\0';
 	
 	memcpy(file->member, qsys.mbr_name, 10);
 	for (int i = 0; i < 10; i++) {
 		if (file->member[i] == '\0') {
-			file->member[i] = 0x40;
+			file->member[i] = ' '_e;
 		}
 	}
 	file->member[10] = '\0';
