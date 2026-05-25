@@ -151,10 +151,19 @@ bool pfgrep::print_line(File *file, const char *line, size_t line_size, int line
 		return false;
 	} else if (!this->quiet) {
 		if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
-			printf("%s:", file->filename);
+			printf("%s%s%s:",
+				this->colourize == 1 ? PFGREP_FILNAM_COLOUR : "",
+				file->filename,
+				this->colourize == 1 ? PFGREP_COLON_COLOUR : "");
 		}
 		if (this->print_line_numbers) {
-			printf("%d:", lineno);
+			printf("%s%d%s:",
+				this->colourize == 1 ? PFGREP_LINENO_COLOUR : "",
+				lineno,
+				this->colourize == 1 ? PFGREP_COLON_COLOUR : "");
+		}
+		if (this->colourize == ColourizeAlways) {
+			printf("%s", PFGREP_NORMAL_COLOUR);
 		}
 		fwrite(line, line_size, 1, stdout);
 		putchar('\n');
@@ -452,6 +461,15 @@ int main(int argc, char **argv)
 		default:
 			usage(argv[0]);
 			return 3;
+		}
+	}
+
+	// TODO: flag
+	if (state.colourize == ColourizeAuto) {
+		if (getenv("NO_COLOR") != nullptr) {
+			state.colourize = ColourizeNever;
+		} else if (isatty(1) && (getenv("TERM") != nullptr)) {
+			state.colourize = ColourizeAlways;
 		}
 	}
 

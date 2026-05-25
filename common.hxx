@@ -11,6 +11,26 @@ extern "C" {
 // In the worst case, a single byte character can become six bytes in UTF-8.
 #define UTF8_SCALE_FACTOR 6
 
+/* Much like Git, we use ANSI colour codes. Use colours like "git grep" */
+#define ANSI_COLOUR_RESET    "\033[m"
+#define ANSI_COLOUR_CYAN     "\033[36m"
+#define ANSI_COLOUR_GREEN    "\033[32m"
+#define ANSI_COLOUR_MAGENTA  "\033[35m"
+#define ANSI_COLOUR_BOLD     "\033[1m"
+#define ANSI_COLOUR_BOLD_RED "\033[1;31m"
+/* Semantic names for if we change them later */
+#define PFGREP_NORMAL_COLOUR ANSI_COLOUR_RESET
+#define PFGREP_MATCH_COLOUR  ANSI_COLOUR_BOLD_RED
+#define PFGREP_FILNAM_COLOUR ANSI_COLOUR_MAGENTA
+#define PFGREP_COLON_COLOUR  ANSI_COLOUR_CYAN
+#define PFGREP_LINENO_COLOUR ANSI_COLOUR_GREEN
+
+typedef enum pfgrep_colourize {
+	ColourizeNever = -1,
+	ColourizeAuto = 0,
+	ColourizeAlways = 1
+} Colourize;
+
 typedef struct pfgrep_file {
 	const char *filename; // IFS
 	int64_t file_size;
@@ -45,6 +65,7 @@ public:
 	char *conv_buffer = nullptr;
 	size_t conv_buffer_size = 0;
 	/* Options */
+	Colourize colourize = ColourizeAuto;
 	bool search_non_source_files = false;
 	bool dont_trim_ending_whitespace = false;
 	// Note quiet does not imply silent et vice versa
