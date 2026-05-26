@@ -28,7 +28,6 @@ extern "C" {
 #include <deque>
 #include <memory>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "common.hxx"
@@ -46,6 +45,17 @@ public:
 
 	std::string pattern;
 	pcre2_code *re;
+};
+
+class Match {
+public:
+	// This is an offset into the file; alive as long as the match
+	const char *line;
+	size_t length;
+	int lineno;
+	// TODO: This should become an array for multiple substrings
+	size_t substring_offset;
+	size_t substring_length;
 };
 
 class pfgrep : public pfbase {
@@ -83,7 +93,7 @@ public:
 private:
 	uint32_t get_compile_flags();
 	uint32_t get_extra_compile_flags();
-	bool print_line(File *file, const char *line, size_t line_size, int lineno);
+	bool print_line(File *file, const char *line, size_t line_size, int lineno, size_t substring_offset, size_t substring_length);
 	int try_patterns(const char *line, size_t line_size);
 };
 
@@ -143,7 +153,7 @@ uint32_t pfgrep::get_extra_compile_flags()
 	return flags;
 }
 
-bool pfgrep::print_line(File *file, const char *line, size_t line_size, int lineno)
+bool pfgrep::print_line(File *file, const char *line, size_t line_size, int lineno, size_t substring_offset, size_t substring_length)
 {
 	if (this->quiet && !this->print_count) {
 		// Special case: Early return since we don't
@@ -165,7 +175,19 @@ bool pfgrep::print_line(File *file, const char *line, size_t line_size, int line
 		if (this->colourize == ColourizeAlways) {
 			printf("%s", PFGREP_NORMAL_COLOUR);
 		}
-		fwrite(line, line_size, 1, stdout);
+		// XXX: This will be more complex as we need to coalesce
+		// several substrings for highlighting.
+		if (this->colourize == ColourizeAlways && substring_offset && substring_length) {
+			fwrite(line, substring_offset, 1, stdout);
+			printf("%s", PFGREP_MATCH_COLOUR);
+			fwrite(line + substring_offset, substring_length, 1, stdout);
+			printf("%s", PFGREP_NORMAL_COLOUR);
+			fwrite(line + substring_offset + substring_length,
+				line_size - substring_offset - substring_length,
+				1, stdout);
+		} else {
+			fwrite(line, line_size, 1, stdout);
+		}
 		putchar('\n');
 	}
 	return true;
@@ -187,6 +209,7 @@ int pfgrep::try_patterns(const char *line, size_t line_size)
 			rc = pcre2_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
 		}
 
+		// TODO: More substrings means we need to try the rest
 		if (rc > 0) {
 			break;
 		} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
@@ -203,7 +226,7 @@ int pfgrep::do_action(File *file)
 	int lineno = 0;
 	int current_after_lines = 0;
 	char *line = this->conv_buffer, *next = NULL;
-	std::deque<std::tuple<const char*, size_t, int>> before_queue;
+	std::deque<Match> before_queue;
 	// If same CCSID, use read buffer, otherwise if EBCDIC/diff ASCII, conv
 	if (file->ccsid == this->pase_ccsid) {
 		line = this->read_buffer;
@@ -221,7 +244,9 @@ int pfgrep::do_action(File *file)
 		}
 		rc = try_patterns(file->description, desc_size);
 		if (rc > 0) {
-			print_line(file, file->description, desc_size, 0);
+			size_t* ovector = pcre2_get_ovector_pointer(this->match_data);
+			print_line(file, file->description, desc_size, 0,
+				ovector[0], ovector[1]);
 		}
 	}
 
@@ -246,6 +271,8 @@ int pfgrep::do_action(File *file)
 			matched = true;
 		}
 
+		size_t* ovector = pcre2_get_ovector_pointer(this->match_data);
+
 		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
 			if (!this->silent) {
 				PCRE2_UCHAR buffer[256];
@@ -257,21 +284,26 @@ int pfgrep::do_action(File *file)
 			current_after_lines = this->after_lines;
 
 			// Drain the queue of before items
-			for (const auto& queued_line : before_queue) {
-				print_line(file, std::get<0>(queued_line),
-					std::get<1>(queued_line),
-					std::get<2>(queued_line));
+			for (const auto& queued_match : before_queue) {
+				print_line(file, queued_match.line,
+					queued_match.length,
+					queued_match.lineno,
+					queued_match.substring_offset,
+					queued_match.substring_length);
 			}
 			before_queue.clear();
 
-			if (!print_line(file, line, conv_size, lineno)) {
+			size_t substring_length = ovector[1] - ovector[0];
+			if (!print_line(file, line, conv_size, lineno,
+					ovector[0], substring_length)) {
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
-			print_line(file, line, conv_size, lineno);
+			print_line(file, line, conv_size, lineno, 0, 0);
 		} else if (this->before_lines) {
 			// Push into the queue; make sure we don't go over
-			before_queue.push_back({line, conv_size, lineno});
+			Match before_match = {line, conv_size, lineno, 0, 0};
+			before_queue.push_back(before_match);
 			if (before_queue.size() > this->before_lines) {
 				before_queue.pop_front();
 			}
