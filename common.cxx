@@ -50,33 +50,33 @@ pfbase::~pfbase()
 #endif
 }
 
-bool pfbase::read_records(File *file, iconv_t conv)
+bool pfbase::read_records(const File &file, iconv_t conv)
 {
-	size_t read_buf_size = file->file_size + 1;
+	size_t read_buf_size = file.file_size + 1;
 	if (read_buf_size > this->read_buffer_size) {
 		this->read_buffer = (char*)realloc(this->read_buffer, read_buf_size);
 		this->read_buffer_size = read_buf_size;
 	}
-	int bytes_to_read = file->file_size;
+	int bytes_to_read = file.file_size;
 	// Read the whole file in
-	while ((bytes_to_read = read(file->fd, this->read_buffer, bytes_to_read)) != 0) {
+	while ((bytes_to_read = read(file.fd, this->read_buffer, bytes_to_read)) != 0) {
 		if (bytes_to_read == -1) {
 			if (!this->silent) {
 				char msg[256 + PATH_MAX];
-				snprintf(msg, sizeof(msg), "read(%s, %d)", file->filename, bytes_to_read);
+				snprintf(msg, sizeof(msg), "read(%s, %d)", file.filename, bytes_to_read);
 				perror_xpf(msg);
 			}
 			return false;
 		}
 	}
-	this->read_buffer[file->file_size] = '\0';
+	this->read_buffer[file.file_size] = '\0';
 
-	size_t record_count = file->record_count;
+	size_t record_count = file.record_count;
 	if (record_count <= 0) {
-		record_count = file->file_size / file->record_length;
+		record_count = file.file_size / file.record_length;
 	}
 	// record length * 6 for worst case UTF-8 conv + newline
-	size_t conv_buf_size = (file->file_size * UTF8_SCALE_FACTOR) + record_count + 1;
+	size_t conv_buf_size = (file.file_size * UTF8_SCALE_FACTOR) + record_count + 1;
 	if (conv_buf_size > this->conv_buffer_size) {
 		this->conv_buffer = (char*)realloc(this->conv_buffer, conv_buf_size);
 		this->conv_buffer_size = conv_buf_size;
@@ -84,12 +84,12 @@ bool pfbase::read_records(File *file, iconv_t conv)
 	char *out = this->conv_buffer;
 	size_t outleft = conv_buf_size;
 	for (size_t record_num = 0; record_num < record_count; record_num++) {
-		char *record = this->read_buffer + (record_num * file->record_length);
+		char *record = this->read_buffer + (record_num * file.record_length);
 		// Converted record is on a 6x multiplier due to possible
 		// worst case EBCDIC->UTF-8 conversion
 		char *in = record;
 		char *beginning = out;
-		size_t inleft = file->record_length;
+		size_t inleft = file.record_length;
 		int rc = iconv(conv, &in, &inleft, &out, &outleft);
 		if (rc != 0) {
 			perror("iconv");
@@ -113,15 +113,15 @@ bool pfbase::read_records(File *file, iconv_t conv)
 	return true;
 }
 
-bool pfbase::read_streamfile(File *file, iconv_t conv)
+bool pfbase::read_streamfile(const File &file, iconv_t conv)
 {
-	size_t read_buf_size = file->file_size + 1;
+	size_t read_buf_size = file.file_size + 1;
 	if (read_buf_size > this->read_buffer_size) {
 		this->read_buffer = (char*)realloc(this->read_buffer, read_buf_size);
 		this->read_buffer_size = read_buf_size;
 	}
-	int bytes_to_read = file->file_size;
-	size_t record_count = file->file_size;
+	int bytes_to_read = file.file_size;
+	size_t record_count = file.file_size;
 	// Assume max length plus newline character for each line
 	size_t conv_buf_size = read_buf_size + record_count;
 	if (conv_buf_size > this->conv_buffer_size) {
@@ -129,27 +129,27 @@ bool pfbase::read_streamfile(File *file, iconv_t conv)
 		this->conv_buffer_size = conv_buf_size;
 	}
 	// Read the whole file in
-	while ((bytes_to_read = read(file->fd, this->read_buffer, bytes_to_read)) != 0) {
+	while ((bytes_to_read = read(file.fd, this->read_buffer, bytes_to_read)) != 0) {
 		if (bytes_to_read == -1) {
 			if (!this->silent) {
 				char msg[256 + PATH_MAX];
-				snprintf(msg, sizeof(msg), "read(%s, %d)", file->filename, bytes_to_read);
+				snprintf(msg, sizeof(msg), "read(%s, %d)", file.filename, bytes_to_read);
 				perror_xpf(msg);
 			}
 			return false;
 		}
 	}
-	this->read_buffer[file->file_size] = '\0';
+	this->read_buffer[file.file_size] = '\0';
 
 	// Skip the copy, we'll just work against the read buffer directly.
 	// Save an unnecessary iconv and conversion.
-	if (file->ccsid == this->pase_ccsid) {
+	if (file.ccsid == this->pase_ccsid) {
 		this->conv_buffer[0] = '\0';
 		return true;
 	}
 
 	char *in = this->read_buffer;
-	size_t inleft = file->file_size;
+	size_t inleft = file.file_size;
 	char *out = this->conv_buffer;
 	size_t outleft = conv_buf_size;
 	int rc = iconv(conv, &in, &inleft, &out, &outleft);
@@ -214,7 +214,7 @@ int pfbase::do_directory(const char *directory)
 	return files_matched;
 }
 
-bool pfbase::set_record_length(File *file)
+bool pfbase::set_record_length(File &file)
 {
 	// Determine the record length, the API to do this needs traditional paths.
 	// Note that it will resolve symlinks for us, so i.e. /QIBM/include works
@@ -222,7 +222,7 @@ bool pfbase::set_record_length(File *file)
 	if (ret == -1) {
 		if (!this->silent) {
 			fprintf(stderr, "filename_to_libobj(%s): Failed to convert IFS path to object name\n",
-				file->filename);
+				file.filename);
 		}
 		return false;
 	}
@@ -233,34 +233,34 @@ bool pfbase::set_record_length(File *file)
 	} else if (file_record_size == 0) {
 		if (!this->silent) {
 			fprintf(stderr, "get_pf_info(%s): Couldn't get record length\n",
-				file->filename);
+				file.filename);
 		}
 		return false;
 	} else if (file_record_size < 0 && this->search_non_source_files) {
 		// Non-source PF, signedness is used as source PF bit
-		file->record_length = -file_record_size;
+		file.record_length = -file_record_size;
 		return true;
 	} else if (file_record_size > 0) {
 		// Source PF, length includes other metadata not pulled when
 		// reading source PFs via POSIX APIs
-		file->record_length = file_record_size - 12;
+		file.record_length = file_record_size - 12;
 		return true;
 	}
 	return false;
 }
 
-int pfbase::do_file(File *file)
+int pfbase::do_file(File &file)
 {
 	char msg[PATH_MAX + 256];
 	int matches = -1;
 	iconv_t conv = (iconv_t)(-1);
-	const char *filename = file->filename;
+	const char *filename = file.filename;
 
 	// Only open after we know it's a valid thing to open.
-	file->fd = open(file->filename, O_RDONLY);
+	file.fd = open(file.filename, O_RDONLY);
 	// We let do_file fill in the filename and CCSID. Technically a TOCTOU
 	// problem, but open(2) error reporting with IBM i objects is goofy.
-	if (file->fd == -1) {
+	if (file.fd == -1) {
 		if (!this->silent) {
 			snprintf(msg, sizeof(msg), "open(%s)", filename);
 			perror_xpf(msg);
@@ -269,18 +269,18 @@ int pfbase::do_file(File *file)
 	}
 
 	// Get member info for an accurate record count
-	if (file->record_length != 0) {
+	if (file.record_length != 0) {
 		if (!get_member_info(file) && !this->silent) {
-			snprintf(msg, sizeof(msg), "get_member_info(%s)", file->filename);
+			snprintf(msg, sizeof(msg), "get_member_info(%s)", file.filename);
 			perror(msg);
 		}
 	}
 
 	// Open a conversion for this CCSID
-	conv = get_iconv(file->ccsid);
+	conv = get_iconv(file.ccsid);
 	if (conv == (iconv_t)(-1)) {
 		if (!this->silent) {
-			snprintf(msg, sizeof(msg), "iconv_open(%d, %d)", Qp2paseCCSID(), file->ccsid);
+			snprintf(msg, sizeof(msg), "iconv_open(%d, %d)", Qp2paseCCSID(), file.ccsid);
 			perror(msg);
 		}
 		goto fail;
@@ -288,7 +288,7 @@ int pfbase::do_file(File *file)
 
 	if (!this->dont_read_file) {
 		// Streamfiles are record length 0, and must be read differently
-		if (file->record_length == 0) {
+		if (file.record_length == 0) {
 			if (!read_streamfile(file, conv)) {
 				goto fail;
 			}
@@ -315,8 +315,8 @@ fail:
 		reset_iconv(conv);
 	}
 
-	if (file->fd != -1) {
-		close(file->fd);
+	if (file.fd != -1) {
+		close(file.fd);
 	}
 	return matches;
 }
@@ -361,14 +361,14 @@ int pfbase::do_thing(const char *filename, bool from_recursion)
 		return 0;
 	} else if (strcmp(s.st_objtype, "*MBR      ") == 0) {
 		f.ccsid = s.st_ccsid; // or st_codepage?
-		if (!set_record_length(&f)) {
+		if (!set_record_length(f)) {
 			return from_recursion ? 0 : -1; // messages emited in function
 		}
-		matches = do_file(&f);
+		matches = do_file(f);
 	} else if (strcmp(s.st_objtype, "*STMF     ") == 0) {
 		f.ccsid = s.st_ccsid; // or st_codepage?
 		f.record_length = 0;
-		matches = do_file(&f);
+		matches = do_file(f);
 	}
 	// XXX: Message for non-PF/members?
 	return matches;

@@ -52,7 +52,7 @@ public:
 	pfbase();
 	~pfbase();
 	void print_version(const char *tool_name);
-	virtual int do_action(File *file) = 0;
+	virtual int do_action(File &file) = 0;
 	int do_thing(const char *filename, bool from_recursion);
 
 	/* Cached system info */
@@ -78,11 +78,11 @@ public:
 	/* Stat options */
 	bool dont_read_file = false;
 private:
-	bool read_records(File *file, iconv_t conv);
-	bool read_streamfile(File *file, iconv_t conv);
-	bool set_record_length(File *file);
+	bool read_records(const File &file, iconv_t conv);
+	bool read_streamfile(const File &file, iconv_t conv);
+	bool set_record_length(File &file);
 	int do_directory(const char *directory);
-	int do_file(File *file);
+	int do_file(File &file);
 };
 
 extern "C" {
@@ -93,11 +93,11 @@ void free_cached_iconv(void);
 void reset_iconv(iconv_t conv);
 
 /* convpath.c */
-int filename_to_libobj(File *file);
+int filename_to_libobj(File &file);
 
 /* rcdfmt.c */
-int get_pf_info(File *file);
+int get_pf_info(const File &file);
 
 /* mbrinfo.c */
-bool get_member_info(File *file);
+bool get_member_info(File &file);
 }

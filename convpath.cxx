@@ -51,7 +51,7 @@ static ILEFunction<void, Qlg_Path_Name_T*, QSYS0100*, const char*, unsigned int,
  * Takes an ASCII IFS path to a traditional object (like /QSYS.LIB/QGPL.LIB/QCLSRC.FILE/X.MBR)
  * and breaks it down into three 29-character EBCDIC strings.
  */
-extern "C" int filename_to_libobj(File *file)
+extern "C" int filename_to_libobj(File &file)
 {
 	struct {
 		Qlg_Path_Name_T	qlg;
@@ -59,8 +59,8 @@ extern "C" int filename_to_libobj(File *file)
 	} input_qlg  = {};
 
 	iconv_t a2e = get_pase_to_system_iconv();
-	char *in = (char*)file->filename, *out = input_qlg.path;
-	size_t inleft = strlen(file->filename), outleft = 1024;
+	char *in = (char*)file.filename, *out = input_qlg.path;
+	size_t inleft = strlen(file.filename), outleft = 1024;
 	iconv(a2e, &in, &inleft, &out, &outleft);
 
 	// /QSYS.LIB/... path names are coerced to 37
@@ -80,23 +80,23 @@ extern "C" int filename_to_libobj(File *file)
 		return -1;
 	}
 
-	memcpy(file->libobj, qsys.obj_name, 10);
-	memcpy(file->libobj + 10, qsys.lib_name, 10);
+	memcpy(file.libobj, qsys.obj_name, 10);
+	memcpy(file.libobj + 10, qsys.lib_name, 10);
 	// Ensure filename is space and not null padded
 	for (int i = 0; i < 20; i++) {
-		if (file->libobj[i] == '\0') {
-			file->libobj[i] = ' '_e;
+		if (file.libobj[i] == '\0') {
+			file.libobj[i] = ' '_e;
 		}
 	}
-	file->libobj[20] = '\0';
+	file.libobj[20] = '\0';
 	
-	memcpy(file->member, qsys.mbr_name, 10);
+	memcpy(file.member, qsys.mbr_name, 10);
 	for (int i = 0; i < 10; i++) {
-		if (file->member[i] == '\0') {
-			file->member[i] = ' '_e;
+		if (file.member[i] == '\0') {
+			file.member[i] = ' '_e;
 		}
 	}
-	file->member[10] = '\0';
+	file.member[10] = '\0';
 
 	return 0;
 }

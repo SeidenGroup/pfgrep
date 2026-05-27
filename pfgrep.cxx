@@ -93,7 +93,7 @@ public:
 	pfgrep& operator=(const pfgrep&) = delete;
 
 	~pfgrep();
-	int do_action(File *file) override;
+	int do_action(File &file) override;
 	void print_version(const char *tool_name);
 	bool add_pattern(const char *expr);
 	bool add_patterns_from_file(const char *path);
@@ -120,7 +120,7 @@ public:
 private:
 	uint32_t get_compile_flags();
 	uint32_t get_extra_compile_flags();
-	bool print_line(const File *file, const Match &match);
+	bool print_line(const File &file, const Match &match);
 	Optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
 };
 
@@ -180,7 +180,7 @@ uint32_t pfgrep::get_extra_compile_flags()
 	return flags;
 }
 
-bool pfgrep::print_line(const File *file, const Match &match)
+bool pfgrep::print_line(const File &file, const Match &match)
 {
 	if (this->quiet && !this->print_count) {
 		// Special case: Early return since we don't
@@ -190,7 +190,7 @@ bool pfgrep::print_line(const File *file, const Match &match)
 		if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
 			printf("%s%s%s:",
 				this->colourize == 1 ? PFGREP_FILNAM_COLOUR : "",
-				file->filename,
+				file.filename,
 				this->colourize == 1 ? PFGREP_COLON_COLOUR : "");
 		}
 		if (this->print_line_numbers) {
@@ -252,7 +252,7 @@ Optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int lin
 	return Match{line, line_size, line_no, ovector[0], substring_length};
 }
 
-int pfgrep::do_action(File *file)
+int pfgrep::do_action(File &file)
 {
 	int matches = 0, rc = 0;
 	int lineno = 0;
@@ -260,21 +260,21 @@ int pfgrep::do_action(File *file)
 	char *line = this->conv_buffer, *next = NULL;
 	std::deque<Match> before_queue;
 	// If same CCSID, use read buffer, otherwise if EBCDIC/diff ASCII, conv
-	if (file->ccsid == this->pase_ccsid) {
+	if (file.ccsid == this->pase_ccsid) {
 		line = this->read_buffer;
 	}
 
 	// For search descriptions (special behaviour where we match,
 	// but treat it as a non-line for i.e. context purposes)
-	if (this->search_descriptions && file->record_length > 0) {
-		size_t desc_size = strlen(file->description);
+	if (this->search_descriptions && file.record_length > 0) {
+		size_t desc_size = strlen(file.description);
 		// Trim since we invariably have this
 		if (!this->dont_trim_ending_whitespace) {
-			while (desc_size > 0 && file->description[desc_size - 1] == ' ') {
+			while (desc_size > 0 && file.description[desc_size - 1] == ' ') {
 				desc_size--;
 			}
 		}
-		Optional<Match> match = try_patterns(file->description, desc_size, 0);
+		Optional<Match> match = try_patterns(file.description, desc_size, 0);
 		if (match != nullopt) {
 			print_line(file, *match);
 		}

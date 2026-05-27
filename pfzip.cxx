@@ -28,7 +28,7 @@ extern "C" {
 
 class pfzip : public pfbase {
 public:
-	int do_action(File *file) override;
+	int do_action(File &file) override;
 	void print_version(const char *tool_name);
 
 	/* Archive */
@@ -68,20 +68,20 @@ static bool is_nul_or_space(const char c)
  * the leading / from a path to make it not absolute, and replace the file
  * extension of a PF member to match its source type when possible.
  */
-static void normalize_path(char *output, size_t output_size, File *file, bool replace_mbr_ext)
+static void normalize_path(char *output, size_t output_size, File &file, bool replace_mbr_ext)
 {
 	// If requested, we can replace the generic .MBR suffix on a member
 	// with a file extension derived from the member's source type.
 	// XXX: Condense these checks, make case insensitive
-	if (replace_mbr_ext && !is_nul_or_space(*file->source_type)
-		&& strstr(file->filename, "/QSYS.LIB/") != NULL
-		&& ends_with_mbr(file->filename) != NULL) {
+	if (replace_mbr_ext && !is_nul_or_space(*file.source_type)
+		&& strstr(file.filename, "/QSYS.LIB/") != NULL
+		&& ends_with_mbr(file.filename) != NULL) {
 		char new_path[PATH_MAX + 1];
 		// +1 to eliminate leading / for abs path
-		strncpy(new_path, file->filename + 1, sizeof(new_path));
+		strncpy(new_path, file.filename + 1, sizeof(new_path));
 		// Copy without whitespace
 		char *extension = ends_with_mbr(new_path);
-		const char *source_type = file->source_type;
+		const char *source_type = file.source_type;
 		while (!is_nul_or_space(*source_type)) {
 			*extension++ = *source_type++;
 		}
@@ -90,19 +90,19 @@ static void normalize_path(char *output, size_t output_size, File *file, bool re
 		return;
 	}
 	// Otherwise, just use the path as-is, removing absoluteness.
-	const char *input = file->filename;
+	const char *input = file.filename;
 	if (input[0] == '/') {
 		input++;
 	}
 	strncpy(output, input, output_size);
 }
 
-int pfzip::do_action(File *file)
+int pfzip::do_action(File &file)
 {
 	zip_int64_t index = -1;
 	int ret = 1, nonfatal_ret;
 	const char *buf = this->conv_buffer;
-	if (file->record_length == 0 && file->ccsid == this->pase_ccsid) {
+	if (file.record_length == 0 && file.ccsid == this->pase_ccsid) {
 		buf = this->read_buffer;
 	}
 	size_t len = strlen(buf);
@@ -112,7 +112,7 @@ int pfzip::do_action(File *file)
 	zip_source_t *s = zip_source_buffer(this->archive, buf_copy, len, 1);
 	if (s == NULL && !this->silent) {
 		fprintf(stderr, "zip_source_buffer(%s): %s\n",
-			file->filename,
+			file.filename,
 			zip_strerror(this->archive));
 		goto fail;
 	}
@@ -122,7 +122,7 @@ int pfzip::do_action(File *file)
 	index = zip_file_add(this->archive, path, s, 0);
 	if (index == -1 && !this->silent) {
 		fprintf(stderr, "zip_file_add(%s): %s\n",
-			file->filename,
+			file.filename,
 			zip_strerror(this->archive));
 		zip_source_free(s);
 		ret = -1;
@@ -132,29 +132,29 @@ int pfzip::do_action(File *file)
 	char comment[512];
 	// Put the member description as a comment.
 	// The other metdata is there too; may not be best place for it
-	if (file->record_length == 0) {
-		snprintf(comment, 512, "(original streamfile CCSID %d)", file->ccsid);
-	} else if (*file->description) {
+	if (file.record_length == 0) {
+		snprintf(comment, 512, "(original streamfile CCSID %d)", file.ccsid);
+	} else if (*file.description) {
 		snprintf(comment, 512, "%s (original PF record length %d CCSID %d)",
-			file->description,
-			file->record_length,
-			file->ccsid);
+			file.description,
+			file.record_length,
+			file.ccsid);
 	} else {
 		snprintf(comment, 512, "(original PF record length %d CCSID %d)",
-			file->record_length,
-			file->ccsid);
+			file.record_length,
+			file.ccsid);
 	}
 	// not critical if these fail, but do warn
 	nonfatal_ret = zip_file_set_comment(this->archive, index, comment, strlen(comment), 0);
 	if (nonfatal_ret && !this->silent) {
 		fprintf(stderr, "zip_file_set_comment: Can't set comment for %s",
-			file->filename);
+			file.filename);
 	}
-	nonfatal_ret = zip_file_set_mtime(this->archive, index, file->mtime, 0);
+	nonfatal_ret = zip_file_set_mtime(this->archive, index, file.mtime, 0);
 	if (nonfatal_ret && !this->silent) {
 		fprintf(stderr, "zip_file_set_comment: Can't set modification time (%zd) for %s",
-			file->mtime,
-			file->filename);
+			file.mtime,
+			file.filename);
 	}
 fail:
 	return ret;

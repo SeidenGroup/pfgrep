@@ -26,7 +26,7 @@ extern "C" {
 
 class pfcat : public pfbase {
 public:
-	int do_action(File *file) override;
+	int do_action(File &file) override;
 };
 
 static void usage(char *argv0)
@@ -34,10 +34,10 @@ static void usage(char *argv0)
 	fprintf(stderr, "usage: %s [-prtV] files\n", argv0);
 }
 
-int pfcat::do_action(File *file)
+int pfcat::do_action(File &file)
 {
-	if (file->record_length == 0) {
-		if (file->ccsid == this->pase_ccsid) {
+	if (file.record_length == 0) {
+		if (file.ccsid == this->pase_ccsid) {
 			printf("%s", this->read_buffer);
 		} else {
 			printf("%s", this->conv_buffer);

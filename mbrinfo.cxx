@@ -27,7 +27,7 @@ using namespace pase_cpp;
 static PGMFunction<char*, int, const char*, const char*, const char*, const char, ERRC0100*> QUSRMBRD("QSYS", "QUSRMBRD", PGMCALL_EXCP_NOSIGNAL);
 
 // assume EBCDIC
-extern "C" bool get_member_info(File *file)
+extern "C" bool get_member_info(File &file)
 {
 	char output[8192];
 	memset(output, 0, 8192);
@@ -35,19 +35,19 @@ extern "C" bool get_member_info(File *file)
 	ERRC0100 errc = {};
 	errc.bytes_avail = sizeof(ERRC0100);
 
-	QUSRMBRD(output, sizeof(output), "MBRD0200"_e, file->libobj, file->member, '0'_e, &errc);
+	QUSRMBRD(output, sizeof(output), "MBRD0200"_e, file.libobj, file.member, '0'_e, &errc);
 	if (errc.exception_id[0] != '\0') {
 		// XXX: Translate common messages like CPF5715 into ENOENT, etc.
 		errno = ENOSYS;
 		return false;
 	}
 
-	file->record_count = *(uint32_t*)(output + 0x8C);
+	file.record_count = *(uint32_t*)(output + 0x8C);
 
 	// XXX: Convert to using struct
 	iconv_t sys_conv = get_iconv(37);
-	char *in = output + 0x30, *out = file->source_type;
-	size_t inleft = 10, outleft = sizeof(file->source_type);
+	char *in = output + 0x30, *out = file.source_type;
+	size_t inleft = 10, outleft = sizeof(file.source_type);
 	iconv(sys_conv, &in, &inleft, &out, &outleft);
 
 	int32_t desc_ccsid = *(uint32_t*)(output + 0xF0);
@@ -60,8 +60,8 @@ extern "C" bool get_member_info(File *file)
 
 	{
 		iconv_t desc_conv = get_iconv(desc_ccsid);
-		char *in = output + 0x54, *out = file->description;
-		size_t inleft = 50, outleft = sizeof(file->description);
+		char *in = output + 0x54, *out = file.description;
+		size_t inleft = 50, outleft = sizeof(file.description);
 		iconv(desc_conv, &in, &inleft, &out, &outleft);
 		// reset in case of shift state
 		reset_iconv(desc_conv);

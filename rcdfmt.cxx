@@ -39,10 +39,10 @@ static std::map<std::string, int> cached_record_sizes;
  * positive number if source PF, as a negative number if not, and 0 if error.
  * errno is set when 0 on error is returned.
  */
-extern "C" int get_pf_info(File *file)
+extern "C" int get_pf_info(const File &file)
 {
 	// XXX: Is it better to use array<char, 20>?
-	std::string filename(file->libobj, 20);
+	std::string filename(file.libobj, 20);
 	// Look at our cached records first
 	auto cached_record_size = cached_record_sizes.find(filename);
 	if (cached_record_size != cached_record_sizes.end()) {
