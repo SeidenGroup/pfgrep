@@ -50,9 +50,10 @@ using std::experimental::nullopt;
 
 class Pattern {
 public:
-	Pattern(const char *pattern, pcre2_code *re) {
+	Pattern(const char *pattern, pcre2_code *re, bool can_jit) {
 		this->pattern = std::string(pattern);
 		this->re = re;
+		this->can_jit = can_jit;
 	}
 
 	~Pattern() {
@@ -61,6 +62,7 @@ public:
 
 	std::string pattern;
 	pcre2_code *re;
+	bool can_jit;
 };
 
 class Match {
@@ -229,7 +231,7 @@ Optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int lin
 
 		// As long as we checked that the pattern successfully was JIT
 		// compiled, it should be safe to use pcre2_jit_match instead.
-		if (this->can_jit) {
+		if (pattern->can_jit) {
 			rc = pcre2_jit_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
 		} else {
 			rc = pcre2_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
@@ -375,19 +377,17 @@ bool pfgrep::add_pattern(const char *expr)
 		this->biggest_capture_count = capture_count;
 	}
 
-	// We should probably be seeing if the JIT status is usable per-expr...
+	bool pattern_can_jit = false;
 	if (this->can_jit) {
 		size_t jit_size = 0;
 		int jit_ret = pcre2_jit_compile(re, PCRE2_JIT_COMPLETE);
 		if (jit_ret == 0) {
 			jit_ret = pcre2_pattern_info(re, PCRE2_INFO_JITSIZE, &jit_size);
-			if (jit_ret != 0 || jit_size == 0) {
-				this->can_jit = false;
-			}
+			pattern_can_jit = jit_size > 0;
 		}
 	}
 
-	this->patterns.push_back(std::make_unique<Pattern>(expr, re));
+	this->patterns.push_back(std::make_unique<Pattern>(expr, re, pattern_can_jit));
 	return true;
 }
 
