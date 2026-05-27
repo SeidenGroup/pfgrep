@@ -27,10 +27,26 @@ extern "C" {
 
 #include <deque>
 #include <memory>
+#if defined(__cpp_lib_optional)
+#include <optional>
+#else
+#include <experimental/optional>
+#endif
 #include <string>
 #include <vector>
 
 #include "common.hxx"
+
+// XXX: Remove when we can assume C++17 minimum
+// We should also use .has_value() instead for C++
+#if defined(__cpp_lib_optional)
+template <class T> using Optional = std::optional<T>;
+using std::nullopt;
+#else
+template <class T>
+using Optional = std::experimental::optional<T>;
+using std::experimental::nullopt;
+#endif
 
 class Pattern {
 public:
@@ -56,6 +72,15 @@ public:
 	// TODO: This should become an array for multiple substrings
 	size_t substring_offset;
 	size_t substring_length;
+};
+
+class PCRE2Error {
+public:
+	PCRE2Error(int rc) {
+		this->rc = rc;
+	}
+
+	int rc;
 };
 
 class pfgrep : public pfbase {
@@ -93,8 +118,8 @@ public:
 private:
 	uint32_t get_compile_flags();
 	uint32_t get_extra_compile_flags();
-	bool print_line(File *file, const char *line, size_t line_size, int lineno, size_t substring_offset, size_t substring_length);
-	int try_patterns(const char *line, size_t line_size);
+	bool print_line(const File *file, const Match &match);
+	Optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
 };
 
 pfgrep::~pfgrep()
@@ -153,7 +178,7 @@ uint32_t pfgrep::get_extra_compile_flags()
 	return flags;
 }
 
-bool pfgrep::print_line(File *file, const char *line, size_t line_size, int lineno, size_t substring_offset, size_t substring_length)
+bool pfgrep::print_line(const File *file, const Match &match)
 {
 	if (this->quiet && !this->print_count) {
 		// Special case: Early return since we don't
@@ -169,7 +194,7 @@ bool pfgrep::print_line(File *file, const char *line, size_t line_size, int line
 		if (this->print_line_numbers) {
 			printf("%s%d%s:",
 				this->colourize == 1 ? PFGREP_LINENO_COLOUR : "",
-				lineno,
+				match.lineno,
 				this->colourize == 1 ? PFGREP_COLON_COLOUR : "");
 		}
 		if (this->colourize == ColourizeAlways) {
@@ -177,23 +202,24 @@ bool pfgrep::print_line(File *file, const char *line, size_t line_size, int line
 		}
 		// XXX: This will be more complex as we need to coalesce
 		// several substrings for highlighting.
-		if (this->colourize == ColourizeAlways && substring_offset && substring_length) {
-			fwrite(line, substring_offset, 1, stdout);
+		if (this->colourize == ColourizeAlways && match.substring_length) {
+			fwrite(match.line, match.substring_offset, 1, stdout);
 			printf("%s", PFGREP_MATCH_COLOUR);
-			fwrite(line + substring_offset, substring_length, 1, stdout);
+			fwrite(match.line + match.substring_offset,
+				match.substring_length, 1, stdout);
 			printf("%s", PFGREP_NORMAL_COLOUR);
-			fwrite(line + substring_offset + substring_length,
-				line_size - substring_offset - substring_length,
+			fwrite(match.line + match.substring_offset + match.substring_length,
+				match.length - match.substring_offset - match.substring_length,
 				1, stdout);
 		} else {
-			fwrite(line, line_size, 1, stdout);
+			fwrite(match.line, match.length, 1, stdout);
 		}
 		putchar('\n');
 	}
 	return true;
 }
 
-int pfgrep::try_patterns(const char *line, size_t line_size)
+Optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int line_no)
 {
 	uint32_t offset = 0, flags = 0;
 	int rc = 0;
@@ -213,11 +239,15 @@ int pfgrep::try_patterns(const char *line, size_t line_size)
 		if (rc > 0) {
 			break;
 		} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
-			// handle error after the loop
-			break;
+			throw PCRE2Error(rc);
 		}
 	}
-	return rc;
+	if (rc < 1) {
+		return nullopt; // No matches
+	}
+	size_t* ovector = pcre2_get_ovector_pointer(this->match_data);
+	size_t substring_length = ovector[1] - ovector[0];
+	return Match{line, line_size, line_no, ovector[0], substring_length};
 }
 
 int pfgrep::do_action(File *file)
@@ -242,11 +272,9 @@ int pfgrep::do_action(File *file)
 				desc_size--;
 			}
 		}
-		rc = try_patterns(file->description, desc_size);
-		if (rc > 0) {
-			size_t* ovector = pcre2_get_ovector_pointer(this->match_data);
-			print_line(file, file->description, desc_size, 0,
-				ovector[0], ovector[1]);
+		Optional<Match> match = try_patterns(file->description, desc_size, 0);
+		if (match != nullopt) {
+			print_line(file, *match);
 		}
 	}
 
@@ -266,40 +294,39 @@ int pfgrep::do_action(File *file)
 			conv_size = strlen(line);
 		}
 
-		rc = try_patterns(line, conv_size);
-		if (rc > 0) {
-			matched = true;
-		}
-
-		size_t* ovector = pcre2_get_ovector_pointer(this->match_data);
-
-		if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
+		Optional<Match> match;
+		try {
+			match = try_patterns(line, conv_size, lineno);
+		} catch (PCRE2Error pcre2error) {
 			if (!this->silent) {
 				PCRE2_UCHAR buffer[256];
 				pcre2_get_error_message(rc, buffer, sizeof(buffer));
 				fprintf(stderr, "failed match error: %s (%d)\n", buffer, rc);
 			}
-		} else if ((matched && !this->invert) || (!matched && this->invert)) {
+			goto fail;
+		}
+
+		if (match != nullopt) {
+			matched = true;
+		}
+		if ((matched && !this->invert) || (!matched && this->invert)) {
 			matches++;
 			current_after_lines = this->after_lines;
 
 			// Drain the queue of before items
 			for (const auto& queued_match : before_queue) {
-				print_line(file, queued_match.line,
-					queued_match.length,
-					queued_match.lineno,
-					queued_match.substring_offset,
-					queued_match.substring_length);
+				print_line(file, queued_match);
 			}
 			before_queue.clear();
 
-			size_t substring_length = ovector[1] - ovector[0];
-			if (!print_line(file, line, conv_size, lineno,
-					ovector[0], substring_length)) {
+			if (matched && !print_line(file, *match)) {
+				goto fail;
+			} else if (!matched && !print_line(file,
+					Match{line, conv_size, lineno, 0, 0})) {
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
-			print_line(file, line, conv_size, lineno, 0, 0);
+			print_line(file, {line, conv_size, lineno, 0, 0});
 		} else if (this->before_lines) {
 			// Push into the queue; make sure we don't go over
 			Match before_match = {line, conv_size, lineno, 0, 0};
