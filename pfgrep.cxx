@@ -232,6 +232,8 @@ bool pfgrep::print_line(const File &file, const Match &match)
 				fwrite(match.line + last_substring_end,
 					match.length - last_substring_end,
 					1, stdout);
+			} else {
+				printf("%s", PFGREP_NORMAL_COLOUR);
 			}
 		} else {
 			if (this->colourize == ColourizeAlways) {
