@@ -251,6 +251,7 @@ Optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int lin
 {
 	uint32_t offset = 0, flags = 0;
 	int rc = 0;
+	// XXX: Enable scan_more for structured output too
 	bool scan_more = this->colourize == ColourizeAlways, matched = false;
 	std::vector<Substring> substrings;
 	size_t last_substring_end = 0;
