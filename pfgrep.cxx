@@ -65,15 +65,27 @@ public:
 	bool can_jit;
 };
 
+class Substring {
+public:
+	size_t offset;
+	size_t length;
+};
+
 class Match {
 public:
+	Match(const char *line, size_t length, int lineno, std::vector<Substring> substrings) {
+		this->line = line;
+		this->length = length;
+		this->lineno = lineno;
+		this->substrings = substrings;
+	}
+
 	// This is an offset into the file; alive as long as the match
 	const char *line;
 	size_t length;
 	int lineno;
-	// TODO: This should become an array for multiple substrings
-	size_t substring_offset;
-	size_t substring_length;
+	// XXX: Right type for this?
+	std::vector<Substring> substrings;
 };
 
 class PCRE2Error {
@@ -199,21 +211,32 @@ bool pfgrep::print_line(const File &file, const Match &match)
 				match.lineno,
 				this->colourize == 1 ? PFGREP_COLON_COLOUR : "");
 		}
-		if (this->colourize == ColourizeAlways) {
-			printf("%s", PFGREP_NORMAL_COLOUR);
-		}
-		// XXX: This will be more complex as we need to coalesce
-		// several substrings for highlighting.
-		if (this->colourize == ColourizeAlways && match.substring_length) {
-			fwrite(match.line, match.substring_offset, 1, stdout);
-			printf("%s", PFGREP_MATCH_COLOUR);
-			fwrite(match.line + match.substring_offset,
-				match.substring_length, 1, stdout);
-			printf("%s", PFGREP_NORMAL_COLOUR);
-			fwrite(match.line + match.substring_offset + match.substring_length,
-				match.length - match.substring_offset - match.substring_length,
-				1, stdout);
+		if (this->colourize == ColourizeAlways && match.substrings.size()) {
+			size_t last_substring_end = 0;
+			for (size_t i = 0; i < match.substrings.size(); i++) {
+				const Substring &substring = match.substrings[i];
+				if (substring.offset > last_substring_end) {
+					printf("%s", PFGREP_NORMAL_COLOUR);
+					fwrite(match.line + last_substring_end,
+						substring.offset - last_substring_end,
+						1, stdout);
+				}
+				printf("%s", PFGREP_MATCH_COLOUR);
+				fwrite(match.line + substring.offset,
+					substring.length,
+					1, stdout);
+				last_substring_end = substring.offset + substring.length;
+			}
+			if (last_substring_end < match.length) {
+				printf("%s", PFGREP_NORMAL_COLOUR);
+				fwrite(match.line + last_substring_end,
+					match.length - last_substring_end,
+					1, stdout);
+			}
 		} else {
+			if (this->colourize == ColourizeAlways) {
+				printf("%s", PFGREP_NORMAL_COLOUR);
+			}
 			fwrite(match.line, match.length, 1, stdout);
 		}
 		putchar('\n');
@@ -225,10 +248,14 @@ Optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int lin
 {
 	uint32_t offset = 0, flags = 0;
 	int rc = 0;
+	bool scan_more = this->colourize == ColourizeAlways, matched = false;
+	std::vector<Substring> substrings;
+	size_t last_substring_end = 0;
 	// We can have multiple expressions. Find the first match.
 	for (const auto& pattern : this->patterns) {
 		pcre2_code *re = pattern->re;
 
+again:
 		// As long as we checked that the pattern successfully was JIT
 		// compiled, it should be safe to use pcre2_jit_match instead.
 		if (pattern->can_jit) {
@@ -237,19 +264,32 @@ Optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int lin
 			rc = pcre2_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
 		}
 
-		// TODO: More substrings means we need to try the rest
 		if (rc > 0) {
+			matched = true;
+			size_t* ovector = pcre2_get_ovector_pointer(this->match_data);
+			size_t substring_length = ovector[1] - ovector[0];
+			// Cheap way to avoid overlap and having to do more
+			// complicated substring coalescing
+			if ((ovector[0] > last_substring_end) || substrings.size() == 0) {
+				substrings.push_back({ovector[0], substring_length});
+			}
+			// Scan more in this string; be careful not to loop
+			// XXX: Use pcre2_next_match when we get newer PCRE2
+			last_substring_end = ovector[1];
+			offset = ovector[1];
+			goto again;
+		}
+
+		if (rc > 0 && !scan_more) {
 			break;
 		} else if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
 			throw PCRE2Error(rc);
 		}
 	}
-	if (rc < 1) {
-		return nullopt; // No matches
+	if (!matched) {
+		return nullopt;
 	}
-	size_t* ovector = pcre2_get_ovector_pointer(this->match_data);
-	size_t substring_length = ovector[1] - ovector[0];
-	return Match{line, line_size, line_no, ovector[0], substring_length};
+	return Match(line, line_size, line_no, substrings);
 }
 
 int pfgrep::do_action(File &file)
@@ -324,14 +364,14 @@ int pfgrep::do_action(File &file)
 			if (matched && !print_line(file, *match)) {
 				goto fail;
 			} else if (!matched && !print_line(file,
-					Match{line, conv_size, lineno, 0, 0})) {
+					Match{line, conv_size, lineno, {}})) {
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
-			print_line(file, {line, conv_size, lineno, 0, 0});
+			print_line(file, {line, conv_size, lineno, {}});
 		} else if (this->before_lines) {
 			// Push into the queue; make sure we don't go over
-			Match before_match = {line, conv_size, lineno, 0, 0};
+			Match before_match = {line, conv_size, lineno, {}};
 			before_queue.push_back(before_match);
 			if (before_queue.size() > this->before_lines) {
 				before_queue.pop_front();
