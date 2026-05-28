@@ -227,13 +227,11 @@ bool pfgrep::print_line(const File &file, const Match &match)
 					1, stdout);
 				last_substring_end = substring.offset + substring.length;
 			}
+			printf("%s", PFGREP_NORMAL_COLOUR);
 			if (last_substring_end < match.length) {
-				printf("%s", PFGREP_NORMAL_COLOUR);
 				fwrite(match.line + last_substring_end,
 					match.length - last_substring_end,
 					1, stdout);
-			} else {
-				printf("%s", PFGREP_NORMAL_COLOUR);
 			}
 		} else {
 			if (this->colourize == ColourizeAlways) {
