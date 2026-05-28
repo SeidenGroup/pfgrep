@@ -33,6 +33,7 @@ extern "C" {
 #include <experimental/optional>
 #endif
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "common.hxx"
@@ -77,7 +78,7 @@ public:
 		this->line = line;
 		this->length = length;
 		this->lineno = lineno;
-		this->substrings = substrings;
+		this->substrings = std::move(substrings);
 	}
 
 	// This is an offset into the file; alive as long as the match
@@ -294,7 +295,7 @@ again:
 	if (!matched) {
 		return nullopt;
 	}
-	return Match(line, line_size, line_no, substrings);
+	return Match(line, line_size, line_no, std::move(substrings));
 }
 
 int pfgrep::do_action(File &file)
