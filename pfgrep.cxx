@@ -213,8 +213,7 @@ bool pfgrep::print_line(const File &file, const Match &match)
 		}
 		if (this->colourize == ColourizeAlways && match.substrings.size()) {
 			size_t last_substring_end = 0;
-			for (size_t i = 0; i < match.substrings.size(); i++) {
-				const Substring &substring = match.substrings[i];
+			for (const auto& substring : match.substrings) {
 				if (substring.offset > last_substring_end) {
 					printf("%s", PFGREP_NORMAL_COLOUR);
 					fwrite(match.line + last_substring_end,
