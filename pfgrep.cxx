@@ -275,6 +275,9 @@ again:
 			}
 			// Scan more in this string; be careful not to loop
 			// XXX: Use pcre2_next_match when we get newer PCRE2
+			if (ovector[0] == ovector[1]) {
+				break; // i.e. if empty string is pattern
+			}
 			last_substring_end = ovector[1];
 			offset = ovector[1];
 			goto again;
