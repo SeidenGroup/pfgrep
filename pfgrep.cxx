@@ -41,11 +41,10 @@ extern "C" {
 // XXX: Remove when we can assume C++17 minimum
 // We should also use .has_value() instead for C++
 #if defined(__cpp_lib_optional)
-template <class T> using Optional = std::optional<T>;
+using std::optional;
 using std::nullopt;
 #else
-template <class T>
-using Optional = std::experimental::optional<T>;
+using std::experimental::optional;
 using std::experimental::nullopt;
 #endif
 
@@ -134,7 +133,7 @@ private:
 	uint32_t get_compile_flags();
 	uint32_t get_extra_compile_flags();
 	bool print_line(const File &file, const Match &match);
-	Optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
+	optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
 };
 
 pfgrep::~pfgrep()
@@ -247,7 +246,7 @@ bool pfgrep::print_line(const File &file, const Match &match)
 	return true;
 }
 
-Optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int line_no)
+optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int line_no)
 {
 	uint32_t offset = 0, flags = 0;
 	int rc = 0;
@@ -321,7 +320,7 @@ int pfgrep::do_action(File &file)
 				desc_size--;
 			}
 		}
-		Optional<Match> match = try_patterns(file.description, desc_size, 0);
+		optional<Match> match = try_patterns(file.description, desc_size, 0);
 		if (match != nullopt) {
 			print_line(file, *match);
 		}
@@ -343,7 +342,7 @@ int pfgrep::do_action(File &file)
 			conv_size = strlen(line);
 		}
 
-		Optional<Match> match;
+		optional<Match> match;
 		try {
 			match = try_patterns(line, conv_size, lineno);
 		} catch (PCRE2Error pcre2error) {
