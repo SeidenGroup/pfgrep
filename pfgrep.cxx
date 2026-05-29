@@ -281,6 +281,9 @@ again:
 			// complicated substring coalescing
 			if ((ovector[0] > last_substring_end) || substrings.size() == 0) {
 				substrings.emplace_back(ovector[0], substring_length);
+			} else if ((ovector[0] == last_substring_end) && substrings.size()) {
+				// If the two substrings run into each other
+				substrings.back().length += substring_length;
 			}
 			// Scan more in this string; be careful not to loop
 			// XXX: Use pcre2_next_match when we get newer PCRE2
