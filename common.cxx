@@ -300,15 +300,6 @@ int pfbase::do_file(File &file)
 	}
 	matches = do_action(file);
 
-	if (matches == 0 && this->print_nonmatching_files) {
-		printf("%s\n", filename);
-	} else if (matches > 0 && this->print_matching_files) {
-		printf("%s\n", filename);
-	}
-	if (this->print_count) {
-		printf("%s:%d\n", filename, matches);
-	}
-
 fail:
 	// shift this should be reset after each file in case of MBCS/DBCS
 	if (conv != (iconv_t)(-1)) {

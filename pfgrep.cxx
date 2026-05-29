@@ -145,6 +145,7 @@ public:
 
 private:
 	void print_separator();
+	void print_filename(const char *filename, int count);
 	bool print_line(const File &file, const Match &match);
 	optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
 };
@@ -215,6 +216,22 @@ void pfgrep::print_separator()
 		printf("%s", PFGREP_COLON_COLOUR);
 	}
 	printf("--\n");
+}
+
+void pfgrep::print_filename(const char *filename, int count)
+{
+	printf("%s%s",
+		this->colourize == 1 ? PFGREP_FILNAM_COLOUR : "",
+		filename);
+	if (count > -1) {
+		printf("%s:%s%d\n",
+			this->colourize == 1 ? PFGREP_COLON_COLOUR : "",
+			this->colourize == 1 ? PFGREP_NORMAL_COLOUR : "",
+			count);
+	} else {
+		printf("%s\n",
+			this->colourize == 1 ? PFGREP_NORMAL_COLOUR : "");
+	}
 }
 
 bool pfgrep::print_line(const File &file, const Match &match)
@@ -428,6 +445,13 @@ int pfgrep::do_action(File &file)
 		line = next;
 	}
 fail:
+	if (matches == 0 && this->print_nonmatching_files) {
+		print_filename(file.filename, -1);
+	} else if (matches > 0 && this->print_matching_files) {
+		print_filename(file.filename, -1);
+	} else if (this->print_count) {
+		print_filename(file.filename, matches);
+	}
 	return matches;
 }
 
@@ -525,6 +549,8 @@ int main(int argc, char **argv)
 			break;
 		case 'c':
 			state.print_count = true;
+			state.print_matching_files = false;
+			state.print_nonmatching_files = false;
 			state.quiet = true; // Implied
 			break;
 		case 'd':
@@ -548,11 +574,13 @@ int main(int argc, char **argv)
 			state.never_print_filename = true;
 			break;
 		case 'L':
+			state.print_count = false;
 			state.print_matching_files = false;
 			state.print_nonmatching_files = true;
 			state.quiet = true; // Implied
 			break;
 		case 'l':
+			state.print_count = false;
 			state.print_matching_files = true;
 			state.print_nonmatching_files = false;
 			state.quiet = true; // Implied
