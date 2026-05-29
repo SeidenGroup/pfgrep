@@ -49,17 +49,16 @@ using std::experimental::nullopt;
 
 class Pattern {
 public:
-	Pattern(const char *pattern, pcre2_code *re, bool can_jit) {
-		this->pattern = std::string(pattern);
+	Pattern(const std::string &expr, pcre2_code *re, bool can_jit) : expr(expr) {
 		this->re = re;
 		this->can_jit = can_jit;
 	}
 
-	~Pattern() {
-		pcre2_code_free(re);
-	}
-
-	std::string pattern;
+	// Lifetime is that of pattern_strings
+	const std::string &expr;
+	// Don't handle destruction in this, since we can get copied by
+	// collections. Free at the end instead.
+	// XXX: Probably use *_ptr...
 	pcre2_code *re;
 	bool can_jit;
 };
@@ -113,10 +112,13 @@ public:
 	~pfgrep();
 	int do_action(File &file) override;
 	void print_version(const char *tool_name);
-	bool add_pattern(const char *expr);
+	bool compile_pattern(const std::string &expr);
 	bool add_patterns_from_file(const char *path);
+	uint32_t get_compile_flags();
+	uint32_t get_extra_compile_flags();
 
 	/* Pattern */
+	std::vector<std::string> pattern_strings;
 	std::vector<Pattern> patterns;
 	pcre2_match_data *match_data = nullptr;
 	uint32_t biggest_capture_count = 0;
@@ -136,8 +138,6 @@ public:
 	unsigned int before_lines = 0;
 
 private:
-	uint32_t get_compile_flags();
-	uint32_t get_extra_compile_flags();
 	bool print_line(const File &file, const Match &match);
 	optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
 };
@@ -146,6 +146,9 @@ pfgrep::~pfgrep()
 {
 #ifdef DEBUG
 	pcre2_match_data_free(this->match_data);
+	for (const auto& pattern : state.patterns) {
+		pcre2_code_free(pattern.re);
+	}
 #endif
 }
 
@@ -352,7 +355,7 @@ int pfgrep::do_action(File &file)
 			if (!this->silent) {
 				PCRE2_UCHAR buffer[256];
 				pcre2_get_error_message(rc, buffer, sizeof(buffer));
-				fprintf(stderr, "failed match error: %s (%d)\n", buffer, rc);
+				fprintf(stderr, "failed match error: %s (%d)\n", buffer, pcre2error.rc);
 			}
 			goto fail;
 		}
@@ -396,25 +399,27 @@ fail:
 	return matches;
 }
 
-bool pfgrep::add_pattern(const char *expr)
+bool pfgrep::compile_pattern(const std::string &expr)
 {
 	int errornumber;
 	PCRE2_SIZE erroroffset;
-	pcre2_compile_context *compile_ctx = pcre2_compile_context_create(NULL);
-	pcre2_set_compile_extra_options(compile_ctx, get_extra_compile_flags());
-	pcre2_code *re = pcre2_compile((PCRE2_SPTR)expr,
+	// It's tempting to reuse this, you can't
+	pcre2_compile_context *compile_context = pcre2_compile_context_create(NULL);
+	pcre2_set_compile_extra_options(compile_context, get_extra_compile_flags());
+	pcre2_code *re = pcre2_compile((PCRE2_SPTR)expr.c_str(),
 			PCRE2_ZERO_TERMINATED,
 			get_compile_flags(),
 			&errornumber,
 			&erroroffset,
-			compile_ctx);
+			compile_context);
 	if (re == NULL) {
 		PCRE2_UCHAR buffer[256];
 		pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
 		fprintf(stderr, "Failed to compile regular expression \"%s\" at offset %d: %s\n",
-				expr,
+				expr.c_str(),
 				(int)erroroffset,
 				buffer);
+		pcre2_compile_context_free(compile_context);
 		return false;
 	}
 
@@ -436,6 +441,7 @@ bool pfgrep::add_pattern(const char *expr)
 	}
 
 	this->patterns.emplace_back(expr, re, pattern_can_jit);
+	pcre2_compile_context_free(compile_context);
 	return true;
 }
 
@@ -455,10 +461,7 @@ bool pfgrep::add_patterns_from_file(const char *path)
 		if (line_len > 0 && line[line_len - 1] == '\n') {
 			line[line_len - 1] = '\0';
 		}
-		if (line_len > 0 && !add_pattern(line)) {
-			ret = false;
-			break;
-		}
+		this->pattern_strings.emplace_back(line);
 		// getline allocated, we duped in array
 		free(line);
 		line = NULL;
@@ -501,9 +504,7 @@ int main(int argc, char **argv)
 			state.search_descriptions = true;
 			break;
 		case 'e':
-			if (!state.add_pattern(optarg)) {
-				return 4;
-			}
+			state.pattern_strings.emplace_back(optarg);
 			break;
 		case 'F':
 			state.fixed = true;
@@ -581,17 +582,20 @@ int main(int argc, char **argv)
 	}
 
 	// If -e nor -f were used, expect expr as first arg
-	bool need_pattern_arg = state.patterns.size() == 0;
-
+	bool need_pattern_arg = state.pattern_strings.size() == 0;
 	// We take physical files, no stdin, so we need expr + files
 	if (need_pattern_arg && optind + 1 >= argc) {
 		usage(argv[0]);
 		return 3;
 	}
-
 	if (need_pattern_arg) {
-		char *expr = strdup(argv[optind++]);
-		if (!state.add_pattern(expr)) {
+		const char *expr = argv[optind++];
+		state.pattern_strings.emplace_back(expr);
+	}
+	// We have to get the list of patterns first; as flags can be passed
+	// after in the case of -e and -f.
+	for (const auto& pattern_string : state.pattern_strings) {
+		if (!state.compile_pattern(pattern_string)) {
 			return 4;
 		}
 	}
