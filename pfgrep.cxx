@@ -26,7 +26,6 @@ extern "C" {
 }
 
 #include <deque>
-#include <memory>
 #if defined(__cpp_lib_optional)
 #include <optional>
 #else
@@ -99,11 +98,6 @@ public:
 
 class pfgrep : public pfbase {
 public:
-	pfgrep() = default;
-	// disable copy constructor for unique_ptr
-	pfgrep(const pfgrep&) = delete;
-	pfgrep& operator=(const pfgrep&) = delete;
-
 	~pfgrep();
 	int do_action(File &file) override;
 	void print_version(const char *tool_name);
@@ -111,7 +105,7 @@ public:
 	bool add_patterns_from_file(const char *path);
 
 	/* Pattern */
-	std::vector<std::unique_ptr<Pattern>> patterns;
+	std::vector<Pattern> patterns;
 	pcre2_match_data *match_data = nullptr;
 	uint32_t biggest_capture_count = 0;
 	bool can_jit = false;
@@ -253,12 +247,12 @@ optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int lin
 	size_t last_substring_end = 0;
 	// We can have multiple expressions. Find the first match.
 	for (const auto& pattern : this->patterns) {
-		pcre2_code *re = pattern->re;
+		pcre2_code *re = pattern.re;
 
 again:
 		// As long as we checked that the pattern successfully was JIT
 		// compiled, it should be safe to use pcre2_jit_match instead.
-		if (pattern->can_jit) {
+		if (pattern.can_jit) {
 			rc = pcre2_jit_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
 		} else {
 			rc = pcre2_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
@@ -430,7 +424,7 @@ bool pfgrep::add_pattern(const char *expr)
 		}
 	}
 
-	this->patterns.push_back(std::make_unique<Pattern>(expr, re, pattern_can_jit));
+	this->patterns.emplace_back(expr, re, pattern_can_jit);
 	return true;
 }
 
