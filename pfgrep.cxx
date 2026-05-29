@@ -140,8 +140,11 @@ public:
 	int max_matches = 0;
 	int after_lines = 0;
 	unsigned int before_lines = 0;
+	/* Current cross-file state */
+	bool has_printed = false;
 
 private:
+	void print_separator();
 	bool print_line(const File &file, const Match &match);
 	optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
 };
@@ -206,6 +209,14 @@ uint32_t pfgrep::get_extra_compile_flags()
 	return flags;
 }
 
+void pfgrep::print_separator()
+{
+	if (this->colourize == ColourizeAlways) {
+		printf("%s", PFGREP_COLON_COLOUR);
+	}
+	printf("--\n");
+}
+
 bool pfgrep::print_line(const File &file, const Match &match)
 {
 	if (this->quiet && !this->print_count) {
@@ -256,6 +267,7 @@ bool pfgrep::print_line(const File &file, const Match &match)
 		}
 		putchar('\n');
 	}
+	this->has_printed = true;
 	return true;
 }
 
@@ -318,6 +330,7 @@ int pfgrep::do_action(File &file)
 {
 	int matches = 0, rc = 0;
 	int lineno = 0;
+	int last_printed_line = -1;
 	int current_after_lines = 0;
 	char *line = this->conv_buffer, *next = nullptr;
 	std::deque<Match> before_queue;
@@ -339,6 +352,7 @@ int pfgrep::do_action(File &file)
 		optional<Match> match = try_patterns(file.description, desc_size, 0);
 		if (match != nullopt) {
 			print_line(file, *match);
+			last_printed_line = 0;
 		}
 	}
 
@@ -377,6 +391,13 @@ int pfgrep::do_action(File &file)
 			matches++;
 			current_after_lines = this->after_lines;
 
+			const bool has_context_lines = this->after_lines || before_lines;
+			const bool separator_for_file = this->has_printed && last_printed_line <= 0;
+			const bool separator_for_group = last_printed_line >= 0 && (last_printed_line < lineno - 1);
+			if (has_context_lines && (separator_for_file || separator_for_group)) {
+				print_separator();
+			}
+			last_printed_line = lineno;
 			// Drain the queue of before items
 			for (const auto& queued_match : before_queue) {
 				print_line(file, queued_match);
@@ -390,6 +411,7 @@ int pfgrep::do_action(File &file)
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
+			last_printed_line = lineno;
 			print_line(file, {line, conv_size, lineno, true});
 		} else if (this->before_lines) {
 			// Push into the queue; make sure we don't go over

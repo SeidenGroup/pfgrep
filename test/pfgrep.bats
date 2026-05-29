@@ -13,6 +13,7 @@ setup_file() {
 	# Install test fixtures
 	system crtlib "$TESTLIB"
 	system crtsrcpf "$TESTLIB/qtxtsrc"
+
 	system addpfm "$TESTLIB/qtxtsrc" abc "text('description')"
 	Rfile -w "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" <<EOF
 ABC
@@ -25,6 +26,22 @@ DEF
 FOO BAR
 FOOBAR
 FOOBAR FOO
+EOF
+
+	system addpfm "$TESTLIB/qtxtsrc" xyz "text('wheat and chaff')"
+	Rfile -w "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR" <<EOF
+chaff
+chaff
+chaff
+FOO BAR
+chaff
+chaff
+chaff
+FOO BAR
+chaff
+chaff
+chaff
+chaff
 EOF
 
 	TESTSTMF_A=$(mktemp /tmp/pfgrep_test.XXXXXXX)
@@ -149,6 +166,7 @@ EOF
 2-AB
 3-
 4-A
+--
 6:ABC
 7-DEF
 8:FOO BAR
@@ -182,6 +200,24 @@ EOF
 6-ABC
 7-DEF
 8-FOO BAR
+EOF
+}
+
+@test "context line file and group separation" {
+	run pfgrep -C 1 -n 'FOO BAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR"
+
+	assert_output - <<EOF
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR-7-DEF
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR:8:FOO BAR
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR-9-FOOBAR
+--
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR-3-chaff
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR:4:FOO BAR
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR-5-chaff
+--
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR-7-chaff
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR:8:FOO BAR
+/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR-9-chaff
 EOF
 }
 
