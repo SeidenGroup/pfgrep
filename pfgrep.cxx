@@ -144,7 +144,8 @@ public:
 	bool has_printed = false;
 
 private:
-	void print_separator();
+	inline const char *maybe_colour(const char *colour);
+	inline void print_separator();
 	void print_filename(const char *filename, int count);
 	bool print_line(const File &file, const Match &match);
 	optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
@@ -210,27 +211,33 @@ uint32_t pfgrep::get_extra_compile_flags()
 	return flags;
 }
 
-void pfgrep::print_separator()
+inline const char *pfgrep::maybe_colour(const char *colour)
 {
 	if (this->colourize == ColourizeAlways) {
-		printf("%s", PFGREP_COLON_COLOUR);
+		return colour;
 	}
-	printf("--\n");
+	return "";
+}
+
+inline void pfgrep::print_separator()
+{
+	// Don't worry about reseting it, as colour output will always follow
+	printf("%s--\n", maybe_colour(PFGREP_COLON_COLOUR));
 }
 
 void pfgrep::print_filename(const char *filename, int count)
 {
 	printf("%s%s",
-		this->colourize == 1 ? PFGREP_FILNAM_COLOUR : "",
+		maybe_colour(PFGREP_FILNAM_COLOUR),
 		filename);
 	if (count > -1) {
 		printf("%s:%s%d\n",
-			this->colourize == 1 ? PFGREP_COLON_COLOUR : "",
-			this->colourize == 1 ? PFGREP_NORMAL_COLOUR : "",
+			maybe_colour(PFGREP_COLON_COLOUR),
+			maybe_colour(PFGREP_NORMAL_COLOUR),
 			count);
 	} else {
 		printf("%s\n",
-			this->colourize == 1 ? PFGREP_NORMAL_COLOUR : "");
+			maybe_colour(PFGREP_NORMAL_COLOUR));
 	}
 }
 
@@ -243,16 +250,16 @@ bool pfgrep::print_line(const File &file, const Match &match)
 	} else if (!this->quiet) {
 		if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
 			printf("%s%s%s%s",
-				this->colourize == 1 ? PFGREP_FILNAM_COLOUR : "",
+				maybe_colour(PFGREP_FILNAM_COLOUR),
 				file.filename,
-				this->colourize == 1 ? PFGREP_COLON_COLOUR : "",
+				maybe_colour(PFGREP_COLON_COLOUR),
 				match.context ? "-" : ":");
 		}
 		if (this->print_line_numbers) {
 			printf("%s%d%s%s",
-				this->colourize == 1 ? PFGREP_LINENO_COLOUR : "",
+				maybe_colour(PFGREP_LINENO_COLOUR),
 				match.lineno,
-				this->colourize == 1 ? PFGREP_COLON_COLOUR : "",
+				maybe_colour(PFGREP_COLON_COLOUR),
 				match.context ? "-" : ":");
 		}
 		if (this->colourize == ColourizeAlways && match.substrings.size()) {
