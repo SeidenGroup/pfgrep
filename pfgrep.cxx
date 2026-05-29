@@ -80,13 +80,15 @@ public:
 		this->line = line;
 		this->length = length;
 		this->lineno = lineno;
+		this->context = false;
 		this->substrings = std::move(substrings);
 	}
 
-	Match(const char *line, size_t length, int lineno) {
+	Match(const char *line, size_t length, int lineno, bool context) {
 		this->line = line;
 		this->length = length;
 		this->lineno = lineno;
+		this->context = context;
 		this->substrings = {};
 	}
 
@@ -94,6 +96,7 @@ public:
 	const char *line;
 	size_t length;
 	int lineno;
+	bool context;
 	// XXX: Right type for this?
 	std::vector<Substring> substrings;
 };
@@ -211,16 +214,18 @@ bool pfgrep::print_line(const File &file, const Match &match)
 		return false;
 	} else if (!this->quiet) {
 		if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
-			printf("%s%s%s:",
+			printf("%s%s%s%s",
 				this->colourize == 1 ? PFGREP_FILNAM_COLOUR : "",
 				file.filename,
-				this->colourize == 1 ? PFGREP_COLON_COLOUR : "");
+				this->colourize == 1 ? PFGREP_COLON_COLOUR : "",
+				match.context ? "-" : ":");
 		}
 		if (this->print_line_numbers) {
-			printf("%s%d%s:",
+			printf("%s%d%s%s",
 				this->colourize == 1 ? PFGREP_LINENO_COLOUR : "",
 				match.lineno,
-				this->colourize == 1 ? PFGREP_COLON_COLOUR : "");
+				this->colourize == 1 ? PFGREP_COLON_COLOUR : "",
+				match.context ? "-" : ":");
 		}
 		if (this->colourize == ColourizeAlways && match.substrings.size()) {
 			size_t last_substring_end = 0;
@@ -381,14 +386,14 @@ int pfgrep::do_action(File &file)
 			if (matched && !print_line(file, *match)) {
 				goto fail;
 			} else if (!matched && !print_line(file,
-					Match(line, conv_size, lineno))) {
+					Match(line, conv_size, lineno, false))) {
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
-			print_line(file, {line, conv_size, lineno, {}});
+			print_line(file, {line, conv_size, lineno, true});
 		} else if (this->before_lines) {
 			// Push into the queue; make sure we don't go over
-			before_queue.emplace_back(line, conv_size, lineno);
+			before_queue.emplace_back(line, conv_size, lineno, true);
 			if (before_queue.size() > this->before_lines) {
 				before_queue.pop_front();
 			}

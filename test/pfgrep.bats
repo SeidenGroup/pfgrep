@@ -146,11 +146,11 @@ EOF
 
 	assert_output - <<EOF
 1:ABC
-2:AB
-3:
-4:A
+2-AB
+3-
+4-A
 6:ABC
-7:DEF
+7-DEF
 8:FOO BAR
 9:FOOBAR
 10:FOOBAR FOO
@@ -161,9 +161,9 @@ EOF
 	run pfgrep -B 3 -n 'FOO' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 
 	assert_output - <<EOF
-5:AB
-6:ABC
-7:DEF
+5-AB
+6-ABC
+7-DEF
 8:FOO BAR
 9:FOOBAR
 10:FOOBAR FOO
@@ -174,14 +174,14 @@ EOF
 	run pfgrep -C 3 -n '^AB$' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 
 	assert_output - <<EOF
-1:ABC
+1-ABC
 2:AB
-3:
-4:A
+3-
+4-A
 5:AB
-6:ABC
-7:DEF
-8:FOO BAR
+6-ABC
+7-DEF
+8-FOO BAR
 EOF
 }
 
