@@ -66,6 +66,11 @@ public:
 
 class Substring {
 public:
+	Substring(size_t offset, size_t length) {
+		this->offset = offset;
+		this->length = length;
+	}
+
 	size_t offset;
 	size_t length;
 };
@@ -77,6 +82,13 @@ public:
 		this->length = length;
 		this->lineno = lineno;
 		this->substrings = std::move(substrings);
+	}
+
+	Match(const char *line, size_t length, int lineno) {
+		this->line = line;
+		this->length = length;
+		this->lineno = lineno;
+		this->substrings = {};
 	}
 
 	// This is an offset into the file; alive as long as the match
@@ -265,7 +277,7 @@ again:
 			// Cheap way to avoid overlap and having to do more
 			// complicated substring coalescing
 			if ((ovector[0] > last_substring_end) || substrings.size() == 0) {
-				substrings.push_back({ovector[0], substring_length});
+				substrings.emplace_back(ovector[0], substring_length);
 			}
 			// Scan more in this string; be careful not to loop
 			// XXX: Use pcre2_next_match when we get newer PCRE2
@@ -361,15 +373,14 @@ int pfgrep::do_action(File &file)
 			if (matched && !print_line(file, *match)) {
 				goto fail;
 			} else if (!matched && !print_line(file,
-					Match{line, conv_size, lineno, {}})) {
+					Match(line, conv_size, lineno))) {
 				goto fail;
 			}
 		} else if (current_after_lines-- > 0) {
 			print_line(file, {line, conv_size, lineno, {}});
 		} else if (this->before_lines) {
 			// Push into the queue; make sure we don't go over
-			Match before_match = {line, conv_size, lineno, {}};
-			before_queue.push_back(before_match);
+			before_queue.emplace_back(line, conv_size, lineno);
 			if (before_queue.size() > this->before_lines) {
 				before_queue.pop_front();
 			}
