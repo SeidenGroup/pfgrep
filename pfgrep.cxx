@@ -120,7 +120,7 @@ public:
 	/* Pattern */
 	std::vector<std::string> pattern_strings;
 	std::vector<Pattern> patterns;
-	pcre2_compile_context *compile_context;
+	pcre2_compile_context *compile_context = nullptr;
 	pcre2_match_data *match_data = nullptr;
 	uint32_t biggest_capture_count = 0;
 	bool can_jit = false;
@@ -270,9 +270,9 @@ again:
 		// As long as we checked that the pattern successfully was JIT
 		// compiled, it should be safe to use pcre2_jit_match instead.
 		if (pattern.can_jit) {
-			rc = pcre2_jit_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
+			rc = pcre2_jit_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, nullptr);
 		} else {
-			rc = pcre2_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, NULL);
+			rc = pcre2_match(re, (PCRE2_SPTR)line, line_size, offset, flags, this->match_data, nullptr);
 		}
 
 		if (rc > 0) {
@@ -314,7 +314,7 @@ int pfgrep::do_action(File &file)
 	int matches = 0, rc = 0;
 	int lineno = 0;
 	int current_after_lines = 0;
-	char *line = this->conv_buffer, *next = NULL;
+	char *line = this->conv_buffer, *next = nullptr;
 	std::deque<Match> before_queue;
 	// If same CCSID, use read buffer, otherwise if EBCDIC/diff ASCII, conv
 	if (file.ccsid == this->pase_ccsid) {
@@ -414,7 +414,7 @@ bool pfgrep::compile_pattern(const std::string &expr)
 			&errornumber,
 			&erroroffset,
 			this->compile_context);
-	if (re == NULL) {
+	if (re == nullptr) {
 		PCRE2_UCHAR buffer[256];
 		pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
 		fprintf(stderr, "Failed to compile regular expression \"%s\" at offset %d: %s\n",
@@ -448,11 +448,11 @@ bool pfgrep::compile_pattern(const std::string &expr)
 bool pfgrep::add_patterns_from_file(const char *path)
 {
 	FILE *f = strcmp(path, "-") == 0 ? stdin : fopen(path, "r");
-	if (f == NULL) {
+	if (f == nullptr) {
 		perror("can't open pattern file");
 		return false;
 	}
-	char *line = NULL;
+	char *line = nullptr;
 	size_t line_limit = 0;
 	ssize_t line_len;
 	bool ret = true;
@@ -464,7 +464,7 @@ bool pfgrep::add_patterns_from_file(const char *path)
 		this->pattern_strings.emplace_back(line);
 		// getline allocated, we duped in array
 		free(line);
-		line = NULL;
+		line = nullptr;
 		line_limit = 0;
 	}
 	if (f != stdin) {
@@ -594,7 +594,7 @@ int main(int argc, char **argv)
 	}
 	// We have to get the list of patterns first; as flags can be passed
 	// after in the case of -e and -f.
-	state.compile_context = pcre2_compile_context_create(NULL);
+	state.compile_context = pcre2_compile_context_create(nullptr);
 	pcre2_set_compile_extra_options(state.compile_context, state.get_extra_compile_flags());
 	for (const auto& pattern_string : state.pattern_strings) {
 		if (!state.compile_pattern(pattern_string)) {
@@ -604,8 +604,8 @@ int main(int argc, char **argv)
 
 	// One big match data that can handle all possible;
 	// uses capture count + 1 like pcre2_match_data_create_from_pattern
-	state.match_data = pcre2_match_data_create(state.biggest_capture_count + 1, NULL);
-	if (state.match_data == NULL) {
+	state.match_data = pcre2_match_data_create(state.biggest_capture_count + 1, nullptr);
+	if (state.match_data == nullptr) {
 		if (!state.silent) {
 			fprintf(stderr, "failed match error: Couldn't allocate memory for match data\n");
 		}
