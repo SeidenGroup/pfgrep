@@ -131,6 +131,7 @@ public:
 	bool print_matching_files = false;
 	bool print_nonmatching_files = false;
 	bool print_count = false;
+	bool print_only_substrings = false;
 	bool case_insensitive = false;
 	bool always_print_filename = false;
 	bool never_print_filename = false;
@@ -150,6 +151,7 @@ private:
 	inline const char *maybe_colour(const char *colour);
 	inline void print_separator();
 	void print_filename(const char *filename, int count);
+	inline void print_line_beginning(const File &file, const Match &match);
 	bool print_line(const File &file, const Match &match);
 	optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
 };
@@ -183,8 +185,8 @@ void pfgrep::print_version(const char *tool_name)
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnpqrstwVvx] pattern files...\n", argv0);
-	fprintf(stderr, "usage: %s [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnpqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
+	fprintf(stderr, "usage: %s [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnopqrstwVvx] pattern files...\n", argv0);
+	fprintf(stderr, "usage: %s [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnopqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
 }
 
 uint32_t pfgrep::get_compile_flags()
@@ -244,27 +246,41 @@ void pfgrep::print_filename(const char *filename, int count)
 	}
 }
 
+inline void pfgrep::print_line_beginning(const File &file, const Match &match)
+{
+	if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
+		printf("%s%s%s%s",
+			maybe_colour(PFGREP_FILNAM_COLOUR),
+			file.filename,
+			maybe_colour(PFGREP_COLON_COLOUR),
+			match.context ? "-" : ":");
+	}
+	if (this->print_line_numbers) {
+		printf("%s%d%s%s",
+			maybe_colour(PFGREP_LINENO_COLOUR),
+			match.lineno,
+			maybe_colour(PFGREP_COLON_COLOUR),
+			match.context ? "-" : ":");
+	}
+}
+
 bool pfgrep::print_line(const File &file, const Match &match)
 {
 	if (this->quiet && !this->print_count) {
 		// Special case: Early return since we don't
 		// to count or print more lines
 		return false;
+	} else if (!this->quiet && this->print_only_substrings && match.substrings.size()) {
+		for (const auto& substring : match.substrings) {
+			print_line_beginning(file, match);
+			printf("%s", maybe_colour(PFGREP_MATCH_COLOUR));
+			fwrite(match.line + substring.offset,
+				substring.length,
+					1, stdout);
+			printf("%s\n", maybe_colour(PFGREP_MATCH_COLOUR));
+		}
 	} else if (!this->quiet) {
-		if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
-			printf("%s%s%s%s",
-				maybe_colour(PFGREP_FILNAM_COLOUR),
-				file.filename,
-				maybe_colour(PFGREP_COLON_COLOUR),
-				match.context ? "-" : ":");
-		}
-		if (this->print_line_numbers) {
-			printf("%s%d%s%s",
-				maybe_colour(PFGREP_LINENO_COLOUR),
-				match.lineno,
-				maybe_colour(PFGREP_COLON_COLOUR),
-				match.context ? "-" : ":");
-		}
+		print_line_beginning(file, match);
 		if (this->colourize == ColourizeAlways && match.substrings.size()) {
 			size_t last_substring_end = 0;
 			for (const auto& substring : match.substrings) {
@@ -545,7 +561,7 @@ int main(int argc, char **argv)
 	state.can_jit = can_jit;
 
 	int ch;
-	while ((ch = getopt(argc, argv, "A:B:C:cde:Ff:HhLlim:npqrstwVvx")) != -1) {
+	while ((ch = getopt(argc, argv, "A:B:C:cde:Ff:HhLlim:nopqrstwVvx")) != -1) {
 		switch (ch) {
 		case 'A':
 			state.after_lines = atoi(optarg);
@@ -603,6 +619,9 @@ int main(int argc, char **argv)
 			break;
 		case 'n':
 			state.print_line_numbers = true;
+			break;
+		case 'o':
+			state.print_only_substrings = true;
 			break;
 		case 'p':
 			state.search_non_source_files = true;

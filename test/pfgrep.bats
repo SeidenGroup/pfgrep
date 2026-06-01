@@ -221,6 +221,17 @@ EOF
 EOF
 }
 
+@test "only matching lines" {
+	run pfgrep -n -o "FOO" "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+
+	assert_output - <<EOF
+8:FOO
+9:FOO
+10:FOO
+10:FOO
+EOF
+}
+
 @test "search descriptions" {
 	run pfgrep -n -d "description" "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 
