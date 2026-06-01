@@ -128,6 +128,9 @@ public:
 	uint32_t biggest_capture_count = 0;
 	bool can_jit = false;
 	/* Options */
+	bool print_matching_files = false;
+	bool print_nonmatching_files = false;
+	bool print_count = false;
 	bool case_insensitive = false;
 	bool always_print_filename = false;
 	bool never_print_filename = false;

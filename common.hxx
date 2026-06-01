@@ -72,9 +72,6 @@ public:
 	bool quiet = false; // No output on successful match
 	bool silent = false; // No output on errors
 	bool recurse = false;
-	bool print_matching_files = false;
-	bool print_nonmatching_files = false;
-	bool print_count = false;
 	/* Stat options */
 	bool dont_read_file = false;
 private:
