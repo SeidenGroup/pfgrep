@@ -11,8 +11,9 @@ PCRE2_LDFLAGS := $(shell pkg-config --libs libpcre2-8)
 ZIP_CFLAGS := $(shell pkg-config --cflags libzip)
 ZIP_LDFLAGS := $(shell pkg-config --libs libzip)
 PASECPP_CFLAGS := -Iinclude/pase-cpp -DPASE_CPP_NO_FORK
+FMT_CFLAGS := -Iinclude/fmt/include -DFMT_USE_LOCALE=0
 
-DEPS_CFLAGS := $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(PASECPP_CFLAGS)
+DEPS_CFLAGS := $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(PASECPP_CFLAGS) $(FMT_CFLAGS)
 DEPS_LDFLAGS := $(PCRE2_LDFLAGS) $(ZIP_LDFLAGS)
 
 # Build with warnings as errors and symbols for developers,
@@ -37,10 +38,14 @@ AR := ar
 
 all: pfgrep pfcat pfstat pfzip
 
+#libfmt.a: include/fmt/src/fmt-c.o include/fmt/src/format.o include/fmt/src/os.o
+libfmt.a: include/fmt/src/format.o
+	$(AR) -X64 cru $@ $^
+
 libpf.a: common.o conv.o errc.o convpath.o rcdfmt.o mbrinfo.o
 	$(AR) -X64 cru $@ $^
 
-pfgrep: pfgrep.o libpf.a
+pfgrep: pfgrep.o libpf.a libfmt.a
 	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 pfcat: pfcat.o libpf.a
@@ -55,11 +60,14 @@ pfzip: pfzip.o libpf.a
 %.o: %.c
 	$(CC) $(DEPS_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
+%.o: %.cc
+	$(CXX) $(DEPS_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+
 %.o: %.cxx
 	$(CXX) $(DEPS_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
 
 clean:
-	rm -f *.o *.a pfgrep pfcat pfstat pfcat core *.tar *.tar.gz
+	rm -f *.o include/fmt/src/*.o *.a pfgrep pfcat pfstat pfcat core *.tar *.tar.gz
 
 check: pfgrep pfcat pfzip
 	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats test/pfcat.bats test/pfzip.bats

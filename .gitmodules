@@ -11,3 +11,6 @@
 [submodule "include/pase-cpp"]
 	path = include/pase-cpp
 	url = https://github.com/SeidenGroup/pase-cpp
+[submodule "include/fmt"]
+	path = include/fmt
+	url = https://github.com/fmtlib/fmt

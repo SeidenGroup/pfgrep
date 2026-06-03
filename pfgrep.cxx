@@ -25,6 +25,8 @@ extern "C" {
 #include "errc.h"
 }
 
+#include <fmt/base.h>
+
 #include <deque>
 #if defined(__cpp_lib_optional)
 #include <optional>
@@ -32,6 +34,11 @@ extern "C" {
 #include <experimental/optional>
 #endif
 #include <string>
+#if defined(__cpp_lib_string_view)
+#include <string_view>
+#else
+#include <experimental/string_view>
+#endif
 #include <utility>
 #include <vector>
 
@@ -45,6 +52,11 @@ using std::nullopt;
 #else
 using std::experimental::optional;
 using std::experimental::nullopt;
+#endif
+#if defined(__cpp_lib_string_view)
+using std::string_view;
+#else
+using std::experimental::string_view;
 #endif
 
 class Pattern {
@@ -229,40 +241,32 @@ inline const char *pfgrep::maybe_colour(const char *colour)
 inline void pfgrep::print_separator()
 {
 	// Don't worry about reseting it, as colour output will always follow
-	printf("%s--\n", maybe_colour(PFGREP_COLON_COLOUR));
+	fmt::println("{}--", maybe_colour(PFGREP_COLON_COLOUR));
 }
 
 void pfgrep::print_filename(const char *filename, int count)
 {
-	printf("%s%s",
-		maybe_colour(PFGREP_FILNAM_COLOUR),
-		filename);
+	fmt::print("{}{}", maybe_colour(PFGREP_FILNAM_COLOUR), filename);
 	if (count > -1) {
-		printf("%s:%s%d\n",
-			maybe_colour(PFGREP_COLON_COLOUR),
-			maybe_colour(PFGREP_NORMAL_COLOUR),
-			count);
+		fmt::print("{}:{}{}", maybe_colour(PFGREP_COLON_COLOUR),
+			maybe_colour(PFGREP_NORMAL_COLOUR), count);
 	} else {
-		printf("%s\n",
-			maybe_colour(PFGREP_NORMAL_COLOUR));
+		fmt::print("{}\n", maybe_colour(PFGREP_NORMAL_COLOUR));
 	}
 }
 
 inline void pfgrep::print_line_beginning(const File &file, const Match &match)
 {
+	const char *colon = match.context ? "-" : ":";
 	if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
-		printf("%s%s%s%s",
-			maybe_colour(PFGREP_FILNAM_COLOUR),
-			file.filename,
-			maybe_colour(PFGREP_COLON_COLOUR),
-			match.context ? "-" : ":");
+		fmt::print("{}{}{}{}", maybe_colour(PFGREP_FILNAM_COLOUR),
+			file.filename, maybe_colour(PFGREP_COLON_COLOUR),
+			colon);
 	}
 	if (this->print_line_numbers) {
-		printf("%s%d%s%s",
-			maybe_colour(PFGREP_LINENO_COLOUR),
-			match.lineno,
-			maybe_colour(PFGREP_COLON_COLOUR),
-			match.context ? "-" : ":");
+		fmt::print("{}{}{}{}", maybe_colour(PFGREP_LINENO_COLOUR),
+			match.lineno, maybe_colour(PFGREP_COLON_COLOUR),
+			colon);
 	}
 }
 
@@ -275,11 +279,9 @@ bool pfgrep::print_line(const File &file, const Match &match)
 	} else if (!this->quiet && this->print_only_substrings && match.substrings.size()) {
 		for (const auto& substring : match.substrings) {
 			print_line_beginning(file, match);
-			printf("%s", maybe_colour(PFGREP_MATCH_COLOUR));
-			fwrite(match.line + substring.offset,
-				substring.length,
-					1, stdout);
-			printf("%s\n", maybe_colour(PFGREP_MATCH_COLOUR));
+			fmt::print("{}{}{}", maybe_colour(PFGREP_MATCH_COLOUR),
+				string_view(match.line + substring.offset, substring.length),
+				maybe_colour(PFGREP_NORMAL_COLOUR));
 		}
 	} else if (!this->quiet) {
 		print_line_beginning(file, match);
@@ -287,30 +289,26 @@ bool pfgrep::print_line(const File &file, const Match &match)
 			size_t last_substring_end = 0;
 			for (const auto& substring : match.substrings) {
 				if (substring.offset > last_substring_end) {
-					printf("%s", PFGREP_NORMAL_COLOUR);
-					fwrite(match.line + last_substring_end,
-						substring.offset - last_substring_end,
-						1, stdout);
+					fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR),
+						string_view(match.line + last_substring_end,
+							substring.offset - last_substring_end));
 				}
-				printf("%s", PFGREP_MATCH_COLOUR);
-				fwrite(match.line + substring.offset,
-					substring.length,
-					1, stdout);
+				fmt::print("{}{}", maybe_colour(PFGREP_MATCH_COLOUR),
+					string_view(match.line + substring.offset, substring.length));
 				last_substring_end = substring.offset + substring.length;
 			}
-			printf("%s", PFGREP_NORMAL_COLOUR);
+			fmt::print("{}", maybe_colour(PFGREP_NORMAL_COLOUR));
 			if (last_substring_end < match.length) {
-				fwrite(match.line + last_substring_end,
-					match.length - last_substring_end,
-					1, stdout);
+				fmt::print("{}", string_view(match.line + last_substring_end,
+					match.length - last_substring_end));
 			}
 		} else {
 			if (this->colourize == ColourizeAlways) {
-				printf("%s", PFGREP_NORMAL_COLOUR);
+				fmt::print("{}", maybe_colour(PFGREP_NORMAL_COLOUR));
 			}
-			fwrite(match.line, match.length, 1, stdout);
+			fmt::print("{}", string_view(match.line, match.length));
 		}
-		putchar('\n');
+		fmt::print("\n");
 	}
 	this->has_printed = true;
 	return true;
