@@ -123,6 +123,7 @@ public:
 	/* Pattern */
 	std::vector<std::string> pattern_strings;
 	std::vector<Pattern> patterns;
+	pcre2_general_context *general_context = nullptr;
 	pcre2_compile_context *compile_context = nullptr;
 	pcre2_match_data *match_data = nullptr;
 	uint32_t biggest_capture_count = 0;
@@ -160,10 +161,11 @@ pfgrep::~pfgrep()
 {
 #ifdef DEBUG
 	pcre2_match_data_free(this->match_data);
-	for (const auto& pattern : state.patterns) {
+	for (const auto& pattern : patterns) {
 		pcre2_code_free(pattern.re);
 	}
 	pcre2_compile_context_free(compile_context);
+	pcre2_general_context_free(general_context);
 #endif
 }
 
@@ -550,9 +552,28 @@ bool pfgrep::add_patterns_from_file(const char *path)
 	return ret;
 }
 
+extern "C" void *pfgrep_wrapped_malloc(size_t n, void*)
+{
+	return malloc(n);
+}
+
+extern "C" void pfgrep_wrapped_free(void *ptr, void*)
+{
+#ifdef DEBUG
+	free(ptr);
+#else
+	(void)ptr;
+#endif
+}
+
 int main(int argc, char **argv)
 {
 	pfgrep state;
+
+	// PCRE only really mallocs for compiling and the JIT; matches are very
+	// memory efficient and don't alloc. But if we do change allocators in
+	// the future, make that easily possible.
+	state.general_context = pcre2_general_context_create(pfgrep_wrapped_malloc, pfgrep_wrapped_free, nullptr);
 
 	// TODO: Decide to warn the user if JIT is disabled, or if JIT is on but
 	// the expression couldn't be compiled. For now, silently ignore errors.
@@ -678,7 +699,7 @@ int main(int argc, char **argv)
 	}
 	// We have to get the list of patterns first; as flags can be passed
 	// after in the case of -e and -f.
-	state.compile_context = pcre2_compile_context_create(nullptr);
+	state.compile_context = pcre2_compile_context_create(state.general_context);
 	pcre2_set_compile_extra_options(state.compile_context, state.get_extra_compile_flags());
 	for (const auto& pattern_string : state.pattern_strings) {
 		if (!state.compile_pattern(pattern_string)) {
@@ -688,7 +709,7 @@ int main(int argc, char **argv)
 
 	// One big match data that can handle all possible;
 	// uses capture count + 1 like pcre2_match_data_create_from_pattern
-	state.match_data = pcre2_match_data_create(state.biggest_capture_count + 1, nullptr);
+	state.match_data = pcre2_match_data_create(state.biggest_capture_count + 1, state.general_context);
 	if (state.match_data == nullptr) {
 		if (!state.silent) {
 			fprintf(stderr, "failed match error: Couldn't allocate memory for match data\n");
