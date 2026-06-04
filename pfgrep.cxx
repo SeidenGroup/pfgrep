@@ -237,10 +237,10 @@ void pfgrep::print_filename(const char *filename, int count)
 {
 	fmt::print("{}{}", maybe_colour(PFGREP_FILNAM_COLOUR), filename);
 	if (count > -1) {
-		fmt::print("{}:{}{}", maybe_colour(PFGREP_COLON_COLOUR),
+		fmt::println("{}:{}{}", maybe_colour(PFGREP_COLON_COLOUR),
 			maybe_colour(PFGREP_NORMAL_COLOUR), count);
 	} else {
-		fmt::print("{}\n", maybe_colour(PFGREP_NORMAL_COLOUR));
+		fmt::println("{}", maybe_colour(PFGREP_NORMAL_COLOUR));
 	}
 }
 
@@ -268,7 +268,7 @@ bool pfgrep::print_line(const File &file, const Match &match)
 	} else if (!this->quiet && this->print_only_substrings && match.substrings.size()) {
 		for (const auto& substring : match.substrings) {
 			print_line_beginning(file, match);
-			fmt::print("{}{}{}\n", maybe_colour(PFGREP_MATCH_COLOUR),
+			fmt::println("{}{}{}", maybe_colour(PFGREP_MATCH_COLOUR),
 				substring, maybe_colour(PFGREP_NORMAL_COLOUR));
 		}
 	} else if (!this->quiet) {
@@ -285,12 +285,11 @@ bool pfgrep::print_line(const File &file, const Match &match)
 			}
 			auto after = string_view(match.line + last_substring_end,
 				match.length - last_substring_end);
-			fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR), after);
+			fmt::println("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR), after);
 		} else {
-			fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR),
+			fmt::println("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR),
 				string_view(match.line, match.length));
 		}
-		fmt::print("\n");
 	}
 	this->has_printed = true;
 	return true;
