@@ -279,20 +279,14 @@ bool pfgrep::print_line(const File &file, const Match &match)
 				if (substring.data() > match.line + last_substring_end) {
 					auto before = string_view(match.line + last_substring_end,
 						(substring.data() - match.line) - last_substring_end);
-//fprintf(stderr, " !! last substr end %zd\n", last_substring_end);
-//fprintf(stderr, " !! before  sv begin %zd len %zd\n", before.data() - match.line, before.size());
-//fprintf(stderr, " !! current sv begin %zd len %zd\n", substring.data() - match.line, substring.size());
 					fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR), before);
 				}
 				fmt::print("{}{}", maybe_colour(PFGREP_MATCH_COLOUR), substring);
 				last_substring_end = (substring.data() - match.line) + substring.size();
 			}
-			fmt::print("{}", maybe_colour(PFGREP_NORMAL_COLOUR));
-			if (last_substring_end < match.length) {
-				auto after = string_view(match.line + last_substring_end,
-					match.length - last_substring_end);
-				fmt::print("{}", after);
-			}
+			auto after = string_view(match.line + last_substring_end,
+				match.length - last_substring_end);
+			fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR), after);
 		} else {
 			if (this->colourize == ColourizeAlways) {
 				fmt::print("{}", maybe_colour(PFGREP_NORMAL_COLOUR));
