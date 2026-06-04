@@ -287,10 +287,8 @@ bool pfgrep::print_line(const File &file, const Match &match)
 				match.length - last_substring_end);
 			fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR), after);
 		} else {
-			if (this->colourize == ColourizeAlways) {
-				fmt::print("{}", maybe_colour(PFGREP_NORMAL_COLOUR));
-			}
-			fmt::print("{}", string_view(match.line, match.length));
+			fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR),
+				string_view(match.line, match.length));
 		}
 		fmt::print("\n");
 	}
