@@ -75,20 +75,9 @@ public:
 	bool can_jit;
 };
 
-class Substring {
-public:
-	Substring(size_t offset, size_t length) {
-		this->offset = offset;
-		this->length = length;
-	}
-
-	size_t offset;
-	size_t length;
-};
-
 class Match {
 public:
-	Match(const char *line, size_t length, int lineno, std::vector<Substring> substrings) {
+	Match(const char *line, size_t length, int lineno, std::vector<string_view> substrings) {
 		this->line = line;
 		this->length = length;
 		this->lineno = lineno;
@@ -110,7 +99,7 @@ public:
 	int lineno;
 	bool context;
 	// XXX: Right type for this?
-	std::vector<Substring> substrings;
+	std::vector<string_view> substrings;
 };
 
 class PCRE2Error {
@@ -279,28 +268,30 @@ bool pfgrep::print_line(const File &file, const Match &match)
 	} else if (!this->quiet && this->print_only_substrings && match.substrings.size()) {
 		for (const auto& substring : match.substrings) {
 			print_line_beginning(file, match);
-			fmt::print("{}{}{}", maybe_colour(PFGREP_MATCH_COLOUR),
-				string_view(match.line + substring.offset, substring.length),
-				maybe_colour(PFGREP_NORMAL_COLOUR));
+			fmt::print("{}{}{}\n", maybe_colour(PFGREP_MATCH_COLOUR),
+				substring, maybe_colour(PFGREP_NORMAL_COLOUR));
 		}
 	} else if (!this->quiet) {
 		print_line_beginning(file, match);
 		if (this->colourize == ColourizeAlways && match.substrings.size()) {
 			size_t last_substring_end = 0;
 			for (const auto& substring : match.substrings) {
-				if (substring.offset > last_substring_end) {
-					fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR),
-						string_view(match.line + last_substring_end,
-							substring.offset - last_substring_end));
+				if (substring.data() > match.line + last_substring_end) {
+					auto before = string_view(match.line + last_substring_end,
+						(substring.data() - match.line) - last_substring_end);
+//fprintf(stderr, " !! last substr end %zd\n", last_substring_end);
+//fprintf(stderr, " !! before  sv begin %zd len %zd\n", before.data() - match.line, before.size());
+//fprintf(stderr, " !! current sv begin %zd len %zd\n", substring.data() - match.line, substring.size());
+					fmt::print("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR), before);
 				}
-				fmt::print("{}{}", maybe_colour(PFGREP_MATCH_COLOUR),
-					string_view(match.line + substring.offset, substring.length));
-				last_substring_end = substring.offset + substring.length;
+				fmt::print("{}{}", maybe_colour(PFGREP_MATCH_COLOUR), substring);
+				last_substring_end = (substring.data() - match.line) + substring.size();
 			}
 			fmt::print("{}", maybe_colour(PFGREP_NORMAL_COLOUR));
 			if (last_substring_end < match.length) {
-				fmt::print("{}", string_view(match.line + last_substring_end,
-					match.length - last_substring_end));
+				auto after = string_view(match.line + last_substring_end,
+					match.length - last_substring_end);
+				fmt::print("{}", after);
 			}
 		} else {
 			if (this->colourize == ColourizeAlways) {
@@ -320,7 +311,7 @@ optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int lin
 	int rc = 0;
 	// XXX: Enable scan_more for structured output too
 	bool scan_more = this->colourize == ColourizeAlways, matched = false;
-	std::vector<Substring> substrings;
+	std::vector<string_view> substrings;
 	size_t last_substring_end = 0;
 	// We can have multiple expressions. Find the first match.
 	for (const auto& pattern : this->patterns) {
@@ -342,10 +333,12 @@ again:
 			// Cheap way to avoid overlap and having to do more
 			// complicated substring coalescing
 			if ((ovector[0] > last_substring_end) || substrings.size() == 0) {
-				substrings.emplace_back(ovector[0], substring_length);
+				substrings.emplace_back(line + ovector[0], substring_length);
 			} else if ((ovector[0] == last_substring_end) && substrings.size()) {
 				// If the two substrings run into each other
-				substrings.back().length += substring_length;
+				const char *old_string = substrings.back().data();
+				size_t new_length = substrings.back().size() + substring_length;
+				substrings.back() = string_view(old_string, new_length);
 			}
 			// Scan more in this string; be careful not to loop
 			// XXX: Use pcre2_next_match when we get newer PCRE2
