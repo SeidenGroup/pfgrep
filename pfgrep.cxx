@@ -5,17 +5,6 @@
  */
 
 extern "C" {
-#include <as400_protos.h>
-#include <as400_types.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <sys/errno.h>
-#include <sys/mode.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 #define PCRE2_CODE_UNIT_WIDTH 8
@@ -27,6 +16,7 @@ extern "C" {
 
 #include <fmt/base.h>
 
+#include <cstdio>
 #include <deque>
 #if defined(__cpp_lib_optional)
 #include <optional>

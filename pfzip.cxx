@@ -5,26 +5,15 @@
  */
 
 extern "C" {
-#include <as400_protos.h>
-#include <as400_types.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/errno.h>
-#include <sys/mode.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include <zip.h>
+
+#include "errc.h"
 }
 
+#include <cstdio>
+#include <cstring>
+
 #include "common.hxx"
-#include "errc.h"
 
 class pfzip : public pfbase {
 public:

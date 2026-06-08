@@ -8,6 +8,7 @@ extern "C" {
 #include </QOpenSys/usr/include/iconv.h>
 }
 
+#include <cstdint>
 #include <unordered_set>
 
 // In the worst case, a single byte character can become six bytes in UTF-8.
