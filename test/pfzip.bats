@@ -26,10 +26,27 @@ FOO BAR
 FOOBAR
 FOOBAR FOO
 EOF
+	system addpfm "$TESTLIB/qtxtsrc" xyz "text('wheat and chaff')"
+	Rfile -w "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR" <<EOF
+chaff
+chaff
+chaff
+FOO BAR
+chaff
+chaff
+chaff
+FOO BAR
+chaff
+chaff
+chaff
+chaff
+EOF
 	# XXX: It seems we can't set the modification date on a member.
 	# Instead, get the current modification date. (GNU date -r ext)
 	MEMBER_MOD_DATE=$(date -r "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" "+%Y-%m-%d %H:%M")
+	MEMBER2_MOD_DATE=$(date -r "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR" "+%Y-%m-%d %H:%M")
 	export MEMBER_MOD_DATE
+	export MEMBER2_MOD_DATE
 
 	TESTSTMF_A=$(mktemp /tmp/pfzip_test.XXXXXXX)
 	export TESTSTMF_A
@@ -86,6 +103,22 @@ Archive:  $TESTZIP
 Sample text file                                   (original PF record length 80 CCSID 37)
 ---------                     -------
        47                     1 file
+
+EOF
+}
+
+@test "members without source types" {
+	pfzip -W "$TESTZIP" "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR"
+	run unzip -l "$TESTZIP"
+
+	assert_output - <<EOF
+Archive:  $TESTZIP
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+       76  $MEMBER_MOD_DATE   QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR
+wheat and chaff                                    (original PF record length 80 CCSID 37)
+---------                     -------
+       76                     1 file
 
 EOF
 }

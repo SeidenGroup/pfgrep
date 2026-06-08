@@ -27,6 +27,8 @@ public:
 	/* Archive options */
 	bool overwrite : 1;
 	bool dont_replace_extension : 1;
+private:
+	std::string normalize_path(const File &file);
 };
 
 void pfzip::print_version(const char *tool_name)
@@ -40,52 +42,36 @@ static void usage(char *argv0)
 	fmt::print(stderr, "usage: {} [-EprstWV] output_file.zip files\n", argv0);
 }
 
-static char *ends_with_mbr(const char *str)
-{
-	char *ext = strrchr(str, '.');
-	if (ext && strcasecmp("MBR", ext + 1) == 0) {
-		return ext + 1;
-	}
-	return NULL;
-}
-
-static bool is_nul_or_space(const char c)
-{
-	return c == ' ' || c == '\0';
-}
-
 /**
  * Change the filename to be better suited to an archive. This can remove
  * the leading / from a path to make it not absolute, and replace the file
  * extension of a PF member to match its source type when possible.
  */
-static void normalize_path(char *output, size_t output_size, File &file, bool replace_mbr_ext)
+std::string pfzip::normalize_path(const File &file)
 {
-	// If requested, we can replace the generic .MBR suffix on a member
-	// with a file extension derived from the member's source type.
-	// XXX: Condense these checks, make case insensitive
-	if (replace_mbr_ext && !is_nul_or_space(*file.source_type)
-		&& strstr(file.filename, "/QSYS.LIB/") != NULL
-		&& ends_with_mbr(file.filename) != NULL) {
-		char new_path[PATH_MAX + 1];
-		// +1 to eliminate leading / for abs path
-		strncpy(new_path, file.filename + 1, sizeof(new_path));
-		// Copy without whitespace
-		char *extension = ends_with_mbr(new_path);
-		const char *source_type = file.source_type;
-		while (!is_nul_or_space(*source_type)) {
-			*extension++ = *source_type++;
-		}
-		*extension = '\0';
-		strncpy(output, new_path, output_size);
-		return;
-	}
-	// Otherwise, just use the path as-is, removing absoluteness.
 	const char *input = file.filename;
+	// Make sure the path in the zip won't be absolute.
 	if (input[0] == '/') {
 		input++;
 	}
-	strncpy(output, input, output_size);
+	std::string new_path(file.filename + 1);
+	// If requested, we can replace the generic .MBR suffix on a member
+	// with a file extension derived from the member's source type.
+	// XXX: make case insensitive, C++20
+	if (this->dont_replace_extension || new_path.find("QSYS.LIB/") == std::string::npos) {
+		return new_path;
+	}
+	std::string source_type(file.source_type);
+	// Trim whitespace in source_type
+	source_type.resize(source_type.find(' '));
+	if (source_type.empty()) {
+		return new_path;
+	}
+	std::string::size_type ext_pos = new_path.find(".MBR");
+	if (ext_pos != std::string::npos) {
+		new_path.replace(ext_pos + 1, 3, source_type);
+	}
+	return new_path;
 }
 
 int pfzip::do_action(File &file)
@@ -108,9 +94,8 @@ int pfzip::do_action(File &file)
 		return -1;
 	}
 
-	char path[PATH_MAX + 1];
-	normalize_path(path, sizeof(path), file, !this->dont_replace_extension);
-	index = zip_file_add(this->archive, path, s, 0);
+	auto path = normalize_path(file);
+	index = zip_file_add(this->archive, path.c_str(), s, 0);
 	if (index == -1 && !this->silent) {
 		fmt::println(stderr, "zip_file_add({}): {}",
 			file.filename,
