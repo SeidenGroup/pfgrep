@@ -8,6 +8,8 @@ extern "C" {
 #include </QOpenSys/usr/include/iconv.h>
 }
 
+#include <unordered_set>
+
 // In the worst case, a single byte character can become six bytes in UTF-8.
 #define UTF8_SCALE_FACTOR 6
 
@@ -58,6 +60,7 @@ public:
 	/* Cached system info */
 	int pase_ccsid = 0;
 	/* Files */
+	std::unordered_set<uint64_t> visited_directories;
 	int file_count = 0;
 	/* Buffers */
 	char *read_buffer = nullptr;

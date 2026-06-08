@@ -335,6 +335,16 @@ int pfbase::do_thing(const char *filename, bool from_recursion)
 	// objtype is *FILE or *DIR, check for mode though to avoid i.e. SAVFs
 	if (S_ISDIR(s.st_mode)) {
 		if (this->recurse) {
+			// Avoid recursion in a loop; get the ID (dev+inode) of
+			// each directory. Note that we use the (truncated?) ID
+			// that's 32-bit for device and inode, so we can mask
+			// them into a single value. Consider that a TODO...
+			uint64_t devino = ((uint64_t)s.st_dev << 32) | s.st_ino;
+			// XXX: C++20: .contains
+			if (visited_directories.find(devino) != visited_directories.end()) {
+				return 0;
+			}
+			visited_directories.emplace(devino);
 			int subdir_files_matched = do_directory(filename);
 			if (subdir_files_matched >= 0) {
 				matches += subdir_files_matched;
