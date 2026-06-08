@@ -24,14 +24,18 @@ extern "C" {
 #include "errc.h"
 }
 
+#include <fmt/format.h>
+
+#include <string>
+
 #include "common.hxx"
 
 void pfbase::print_version(const char *tool_name)
 {
-	fprintf(stderr, "%s " PFGREP_VERSION "\n", tool_name);
-	fprintf(stderr, "Copyright (c) Seiden Group 2024-2025\n");
-	fprintf(stderr, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n");
-	fprintf(stderr, "Written by Calvin Buckley and others, see <https://github.com/SeidenGroup/pfgrep/graphs/contributors>\n");
+	fmt::println(stderr, "{} " PFGREP_VERSION, tool_name);
+	fmt::println(stderr, "Copyright (c) Seiden Group 2024-2025");
+	fmt::println(stderr, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>");
+	fmt::println(stderr, "Written by Calvin Buckley and others, see <https://github.com/SeidenGroup/pfgrep/graphs/contributors>");
 }
 
 pfbase::pfbase()
@@ -62,9 +66,9 @@ bool pfbase::read_records(const File &file, iconv_t conv)
 	while ((bytes_to_read = read(file.fd, this->read_buffer, bytes_to_read)) != 0) {
 		if (bytes_to_read == -1) {
 			if (!this->silent) {
-				char msg[256 + PATH_MAX];
-				snprintf(msg, sizeof(msg), "read(%s, %d)", file.filename, bytes_to_read);
-				perror_xpf(msg);
+				std::string msg;
+				msg = fmt::format("read({}, {})", file.filename, bytes_to_read);
+				perror_xpf(msg.c_str());
 			}
 			return false;
 		}
@@ -132,9 +136,9 @@ bool pfbase::read_streamfile(const File &file, iconv_t conv)
 	while ((bytes_to_read = read(file.fd, this->read_buffer, bytes_to_read)) != 0) {
 		if (bytes_to_read == -1) {
 			if (!this->silent) {
-				char msg[256 + PATH_MAX];
-				snprintf(msg, sizeof(msg), "read(%s, %d)", file.filename, bytes_to_read);
-				perror_xpf(msg);
+				std::string msg;
+				msg = fmt::format("read({}, {})", file.filename, bytes_to_read);
+				perror_xpf(msg.c_str());
 			}
 			return false;
 		}
@@ -168,13 +172,13 @@ bool pfbase::read_streamfile(const File &file, iconv_t conv)
  */
 int pfbase::do_directory(const char *directory)
 {
-	char msg[PATH_MAX + 256];
+	std::string msg;
 	int files_matched = 0;
 	DIR *dir = opendir(directory);
 	if (dir == NULL) {
 		if (!this->silent) {
-			snprintf(msg, sizeof(msg), "opendir(%s)", directory);
-			perror_xpf(msg);
+			msg = fmt::format("opendir({})", directory);
+			perror_xpf(msg.c_str());
 		}
 		return -1;
 	}
@@ -190,15 +194,15 @@ int pfbase::do_directory(const char *directory)
 
 		// XXX: Technically on i, it might be faster to chdir rather
 		// than use a full path, since resolution is faster from CWD
-		char full_path[PATH_MAX + 1];
+		std::string full_path;
 		// Avoid doubling the / if user has a trailing one passed
 		// XXX: Should normalize these before the QSYS name conversion
 		if (directory[strlen(directory) - 1] == '/' ) {
-			snprintf(full_path, sizeof(full_path), "%s%s", directory, dirent->d_name);
+			full_path = fmt::format("{}{}", directory, dirent->d_name);
 		} else {
-			snprintf(full_path, sizeof(full_path), "%s/%s", directory, dirent->d_name);
+			full_path = fmt::format("{}/{}", directory, dirent->d_name);
 		}
-		int ret = do_thing(full_path, true);
+		int ret = do_thing(full_path.c_str(), true);
 		if (ret > 0) {
 			files_matched += ret;
 		}
@@ -206,8 +210,8 @@ int pfbase::do_directory(const char *directory)
 	}
 	if (errno != 0) {
 		if (!this->silent) {
-			snprintf(msg, sizeof(msg), "reading dirent in %s", directory);
-			perror_xpf(msg);
+			msg = fmt::format("reading dirent in {}", directory);
+			perror_xpf(msg.c_str());
 		}
 	}
 	closedir(dir);
@@ -221,7 +225,7 @@ bool pfbase::set_record_length(File &file)
 	int ret = filename_to_libobj(file);
 	if (ret == -1) {
 		if (!this->silent) {
-			fprintf(stderr, "filename_to_libobj(%s): Failed to convert IFS path to object name\n",
+			fmt::println(stderr, "filename_to_libobj({}): Failed to convert IFS path to object name",
 				file.filename);
 		}
 		return false;
@@ -232,7 +236,7 @@ bool pfbase::set_record_length(File &file)
 		return false;
 	} else if (file_record_size == 0) {
 		if (!this->silent) {
-			fprintf(stderr, "get_pf_info(%s): Couldn't get record length\n",
+			fmt::println(stderr, "get_pf_info({}): Couldn't get record length",
 				file.filename);
 		}
 		return false;
@@ -251,7 +255,7 @@ bool pfbase::set_record_length(File &file)
 
 int pfbase::do_file(File &file)
 {
-	char msg[PATH_MAX + 256];
+	std::string msg;
 	int matches = -1;
 	iconv_t conv = (iconv_t)(-1);
 	const char *filename = file.filename;
@@ -262,8 +266,8 @@ int pfbase::do_file(File &file)
 	// problem, but open(2) error reporting with IBM i objects is goofy.
 	if (file.fd == -1) {
 		if (!this->silent) {
-			snprintf(msg, sizeof(msg), "open(%s)", filename);
-			perror_xpf(msg);
+			msg = fmt::format("open({})", filename);
+			perror_xpf(msg.c_str());
 		}
 		return -1;
 	}
@@ -271,8 +275,8 @@ int pfbase::do_file(File &file)
 	// Get member info for an accurate record count
 	if (file.record_length != 0) {
 		if (!get_member_info(file) && !this->silent) {
-			snprintf(msg, sizeof(msg), "get_member_info(%s)", file.filename);
-			perror(msg);
+			msg = fmt::format("get_member_info({})", file.filename);
+			perror(msg.c_str());
 		}
 	}
 
@@ -280,8 +284,8 @@ int pfbase::do_file(File &file)
 	conv = get_iconv(file.ccsid);
 	if (conv == (iconv_t)(-1)) {
 		if (!this->silent) {
-			snprintf(msg, sizeof(msg), "iconv_open(%d, %d)", Qp2paseCCSID(), file.ccsid);
-			perror(msg);
+			msg = fmt::format("iconv_open({}, {})", Qp2paseCCSID(), file.ccsid);
+			perror(msg.c_str());
 		}
 		goto fail;
 	}
@@ -314,7 +318,7 @@ fail:
 
 int pfbase::do_thing(const char *filename, bool from_recursion)
 {
-	char msg[PATH_MAX + 256];
+	std::string msg;
 	int matches = 0;
 	struct stat64_ILE s = {};
 	File f = {};
@@ -324,8 +328,8 @@ int pfbase::do_thing(const char *filename, bool from_recursion)
 	int ret = statx((char*)filename, (struct stat*)&s, sizeof(s), STX_XPFSS_PASE);
 	if (ret == -1) {
 		if (!this->silent) {
-			snprintf(msg, sizeof(msg), "stat(%s)", filename);
-			perror_xpf(msg);
+			msg = fmt::format("stat({})", filename);
+			perror_xpf(msg.c_str());
 		}
 		return -1;
 	}
@@ -351,7 +355,7 @@ int pfbase::do_thing(const char *filename, bool from_recursion)
 			}
 		} else {
 			if (!this->silent) {
-				fprintf(stderr, "stat(%s): Is a directory or physical file\n", filename);
+				fmt::println(stderr, "stat({}): Is a directory or physical file", filename);
 			}
 			return -1;
 		}

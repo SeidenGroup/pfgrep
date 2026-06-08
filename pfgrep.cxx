@@ -16,7 +16,6 @@ extern "C" {
 
 #include <fmt/base.h>
 
-#include <cstdio>
 #include <deque>
 #if defined(__cpp_lib_optional)
 #include <optional>
@@ -167,19 +166,19 @@ void pfgrep::print_version(const char *tool_name)
 	uint32_t pcre2_can_jit = 0;
 	pcre2_config(PCRE2_CONFIG_JIT, &pcre2_can_jit);
 	pcre2_config(PCRE2_CONFIG_VERSION, pcre2_ver);
-	fprintf(stderr, "\tusing PCRE2 %s", pcre2_ver);
+	fmt::print(stderr, "\tusing PCRE2 {}", pcre2_ver);
 	if (pcre2_can_jit) {
 		pcre2_config(PCRE2_CONFIG_JITTARGET, pcre2_jit);
-		fprintf(stderr, " (JIT target: %s)\n", pcre2_jit);
+		fmt::println(stderr, " (JIT target: {})", pcre2_jit);
 	} else {
-		fprintf(stderr, " (no JIT)\n");
+		fmt::println(stderr, " (no JIT)");
 	}
 }
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnopqrstwVvx] pattern files...\n", argv0);
-	fprintf(stderr, "usage: %s [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnopqrstwVvx] [-e pattern] [-f file] files...\n", argv0);
+	fmt::println(stderr, "usage: {} [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnopqrstwVvx] pattern files...", argv0);
+	fmt::println(stderr, "usage: {} [-A num] [-B num] [-C num] [-m matches] [-cFHhiLlnopqrstwVvx] [-e pattern] [-f file] files...", argv0);
 }
 
 uint32_t pfgrep::get_compile_flags()
@@ -395,7 +394,7 @@ int pfgrep::do_action(File &file)
 			if (!this->silent) {
 				PCRE2_UCHAR buffer[256];
 				pcre2_get_error_message(rc, buffer, sizeof(buffer));
-				fprintf(stderr, "failed match error: %s (%d)\n", buffer, pcre2error.rc);
+				fmt::print(stderr, "failed match error: {} ({})", (const char*)buffer, pcre2error.rc);
 			}
 			goto fail;
 		}
@@ -467,10 +466,10 @@ bool pfgrep::compile_pattern(const std::string &expr)
 	if (re == nullptr) {
 		PCRE2_UCHAR buffer[256];
 		pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
-		fprintf(stderr, "Failed to compile regular expression \"%s\" at offset %d: %s\n",
-				expr.c_str(),
+		fmt::println(stderr, "Failed to compile regular expression \"{}\" at offset {}: {}",
+				expr,
 				(int)erroroffset,
-				buffer);
+				(const char*)buffer);
 		return false;
 	}
 
@@ -683,7 +682,7 @@ int main(int argc, char **argv)
 	state.match_data = pcre2_match_data_create(state.biggest_capture_count + 1, state.general_context);
 	if (state.match_data == nullptr) {
 		if (!state.silent) {
-			fprintf(stderr, "failed match error: Couldn't allocate memory for match data\n");
+			fmt::println(stderr, "failed match error: Couldn't allocate memory for match data");
 		}
 		return 6;
 	}

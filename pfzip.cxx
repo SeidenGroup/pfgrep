@@ -10,8 +10,10 @@ extern "C" {
 #include "errc.h"
 }
 
-#include <cstdio>
+#include <fmt/format.h>
+
 #include <cstring>
+#include <string>
 
 #include "common.hxx"
 
@@ -30,12 +32,12 @@ public:
 void pfzip::print_version(const char *tool_name)
 {
 	pfbase::print_version(tool_name);
-	fprintf(stderr, "\tusing libzip %s\n", zip_libzip_version());
+	fmt::print(stderr, "\tusing libzip {}\n", zip_libzip_version());
 }
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-EprstWV] output_file.zip files\n", argv0);
+	fmt::print(stderr, "usage: {} [-EprstWV] output_file.zip files\n", argv0);
 }
 
 static char *ends_with_mbr(const char *str)
@@ -89,7 +91,7 @@ static void normalize_path(char *output, size_t output_size, File &file, bool re
 int pfzip::do_action(File &file)
 {
 	zip_int64_t index = -1;
-	int ret = 1, nonfatal_ret;
+	int nonfatal_ret;
 	const char *buf = this->conv_buffer;
 	if (file.record_length == 0 && file.ccsid == this->pase_ccsid) {
 		buf = this->read_buffer;
@@ -100,53 +102,51 @@ int pfzip::do_action(File &file)
 	char *buf_copy = strdup(buf);
 	zip_source_t *s = zip_source_buffer(this->archive, buf_copy, len, 1);
 	if (s == NULL && !this->silent) {
-		fprintf(stderr, "zip_source_buffer(%s): %s\n",
+		fmt::print(stderr, "zip_source_buffer({}): {}\n",
 			file.filename,
 			zip_strerror(this->archive));
-		goto fail;
+		return -1;
 	}
 
 	char path[PATH_MAX + 1];
 	normalize_path(path, sizeof(path), file, !this->dont_replace_extension);
 	index = zip_file_add(this->archive, path, s, 0);
 	if (index == -1 && !this->silent) {
-		fprintf(stderr, "zip_file_add(%s): %s\n",
+		fmt::println(stderr, "zip_file_add({}): {}",
 			file.filename,
 			zip_strerror(this->archive));
 		zip_source_free(s);
-		ret = -1;
-		goto fail;
+		return -1;
 	}
 
-	char comment[512];
 	// Put the member description as a comment.
 	// The other metdata is there too; may not be best place for it
+	std::string comment;
 	if (file.record_length == 0) {
-		snprintf(comment, 512, "(original streamfile CCSID %d)", file.ccsid);
+		comment = fmt::format("(original streamfile CCSID {})", file.ccsid);
 	} else if (*file.description) {
-		snprintf(comment, 512, "%s (original PF record length %d CCSID %d)",
+		comment = fmt::format("{} (original PF record length {} CCSID {})",
 			file.description,
 			file.record_length,
 			file.ccsid);
 	} else {
-		snprintf(comment, 512, "(original PF record length %d CCSID %d)",
+		comment = fmt::format("(original PF record length {} CCSID {})",
 			file.record_length,
 			file.ccsid);
 	}
 	// not critical if these fail, but do warn
-	nonfatal_ret = zip_file_set_comment(this->archive, index, comment, strlen(comment), 0);
+	nonfatal_ret = zip_file_set_comment(this->archive, index, comment.c_str(), comment.size(), 0);
 	if (nonfatal_ret && !this->silent) {
-		fprintf(stderr, "zip_file_set_comment: Can't set comment for %s",
+		fmt::println(stderr, "zip_file_set_comment: Can't set comment for {}",
 			file.filename);
 	}
 	nonfatal_ret = zip_file_set_mtime(this->archive, index, file.mtime, 0);
 	if (nonfatal_ret && !this->silent) {
-		fprintf(stderr, "zip_file_set_comment: Can't set modification time (%zd) for %s",
+		fmt::println(stderr, "zip_file_set_comment: Can't set modification time ({}) for {}",
 			file.mtime,
 			file.filename);
 	}
-fail:
-	return ret;
+	return 1;
 }
 
 int main(int argc, char **argv)
@@ -190,7 +190,7 @@ int main(int argc, char **argv)
 	const char *output_file = argv[optind++];
 	state.file_count = argc - optind;
 	if (state.file_count == 0 && !state.silent) {
-		fprintf(stderr, "%s: need files for archive\n", argv[0]);
+		fmt::println(stderr, "{}: need files for archive", argv[0]);
 		return 5;
 	}
 
@@ -203,7 +203,7 @@ int main(int argc, char **argv)
 	if (state.archive == NULL && !state.silent) {
 		zip_error_t error;
 		zip_error_init_with_code(&error, zerrno);
-		fprintf(stderr, "zip_open: %s\n",
+		fmt::println(stderr, "zip_open: {}",
         		zip_error_strerror(&error));
 		zip_error_fini(&error);
 		return 6;
@@ -220,7 +220,7 @@ int main(int argc, char **argv)
 	}
 
 	if (zip_close(state.archive) == -1 && !state.silent) {
-		fprintf(stderr, "zip_close: %s\n", zip_strerror(state.archive));
+		fmt::println(stderr, "zip_close: {}", zip_strerror(state.archive));
 		return 4;
 	}
 

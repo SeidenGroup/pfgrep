@@ -48,13 +48,13 @@ libpf.a: common.o conv.o errc.o convpath.o rcdfmt.o mbrinfo.o
 pfgrep: pfgrep.o libpf.a libfmt.a
 	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
-pfcat: pfcat.o libpf.a
+pfcat: pfcat.o libpf.a libfmt.a
 	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
-pfstat: pfstat.o libpf.a
+pfstat: pfstat.o libpf.a libfmt.a
 	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
-pfzip: pfzip.o libpf.a
+pfzip: pfzip.o libpf.a libfmt.a
 	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
 %.o: %.c

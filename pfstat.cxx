@@ -8,7 +8,7 @@ extern "C" {
 #include "errc.h"
 }
 
-#include <cstdio>
+#include <fmt/base.h>
 
 #include "common.hxx"
 
@@ -19,7 +19,7 @@ public:
 
 static void usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-prV] files\n", argv0);
+	fmt::print(stderr, "usage: {} [-prV] files\n", argv0);
 }
 
 int pfstat::do_action(File &file)
@@ -27,12 +27,12 @@ int pfstat::do_action(File &file)
 	if (file.record_length == 0) {
 		// Better off using i.e. stat
 		if (this->silent) {
-			fprintf(stderr, "%s: Not a member\n",
+			fmt::println(stderr, "{}: Not a member",
 				file.filename);
 		}
 		return -1;
 	}
-	printf("%s\t%ld\t%s\t%d\t%d\t%s\n",
+	fmt::println("{}\t{}\t{}\t{}\t{}\t{}",
 		file.filename,
 		file.file_size,
 		file.source_type,
