@@ -9,7 +9,19 @@ extern "C" {
 }
 
 #include <cstdint>
+#include <string>
+#if defined(__cpp_lib_string_view)
+#include <string_view>
+#else
+#include <experimental/string_view>
+#endif
 #include <unordered_set>
+
+#if defined(__cpp_lib_string_view)
+using std::string_view;
+#else
+using std::experimental::string_view;
+#endif
 
 // In the worst case, a single byte character can become six bytes in UTF-8.
 #define UTF8_SCALE_FACTOR 6
@@ -35,7 +47,8 @@ typedef enum pfgrep_colourize {
 } Colourize;
 
 typedef struct pfgrep_file {
-	const char *filename; // IFS
+	std::string full_filename; // used for naming the file
+	string_view short_filename; // used for opening the file
 	int64_t file_size;
 	time_t mtime;
 	int fd;
@@ -57,6 +70,7 @@ public:
 	void print_version(const char *tool_name);
 	virtual int do_action(File &file) = 0;
 	int do_thing(const char *filename, bool from_recursion);
+	int do_thing(const char *filename, const char *dirname,  bool from_recursion);
 
 	/* Cached system info */
 	int pase_ccsid = 0;

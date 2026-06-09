@@ -63,7 +63,7 @@ bool pfbase::read_records(const File &file, iconv_t conv)
 		if (bytes_to_read == -1) {
 			if (!this->silent) {
 				std::string msg;
-				msg = fmt::format("read({}, {})", file.filename, bytes_to_read);
+				msg = fmt::format("read({}, {})", file.short_filename, bytes_to_read);
 				perror_xpf(msg.c_str());
 			}
 			return false;
@@ -133,7 +133,7 @@ bool pfbase::read_streamfile(const File &file, iconv_t conv)
 		if (bytes_to_read == -1) {
 			if (!this->silent) {
 				std::string msg;
-				msg = fmt::format("read({}, {})", file.filename, bytes_to_read);
+				msg = fmt::format("read({}, {})", file.full_filename, bytes_to_read);
 				perror_xpf(msg.c_str());
 			}
 			return false;
@@ -179,6 +179,22 @@ int pfbase::do_directory(const char *directory)
 		return -1;
 	}
 	struct dirent *dirent = NULL;
+	char old_dir[PATH_MAX + 1];
+	// On i, resolution is faster from cwd, path traversal is expensive
+	if (getcwd(old_dir, PATH_MAX + 1) == NULL) {
+		if (!this->silent) {
+			msg = fmt::format("getcwd({})", directory);
+			perror_xpf(msg.c_str());
+		}
+		return -1;
+	}
+	if (chdir(directory) == -1) {
+		if (!this->silent) {
+			msg = fmt::format("getcwd({})", directory);
+			perror_xpf(msg.c_str());
+		}
+		return -1;
+	}
 	while ((dirent = readdir(dir)) != NULL) {
 		if (strcmp(dirent->d_name, ".") == 0 || strcmp(dirent->d_name, "..") == 0) {
 			continue;
@@ -188,17 +204,7 @@ int pfbase::do_directory(const char *directory)
 		// so filenames of subdirectories are printed
 		this->file_count++;
 
-		// XXX: Technically on i, it might be faster to chdir rather
-		// than use a full path, since resolution is faster from CWD
-		std::string full_path;
-		// Avoid doubling the / if user has a trailing one passed
-		// XXX: Should normalize these before the QSYS name conversion
-		if (directory[strlen(directory) - 1] == '/' ) {
-			full_path = fmt::format("{}{}", directory, dirent->d_name);
-		} else {
-			full_path = fmt::format("{}/{}", directory, dirent->d_name);
-		}
-		int ret = do_thing(full_path.c_str(), true);
+		int ret = do_thing(dirent->d_name, directory, true);
 		if (ret > 0) {
 			files_matched += ret;
 		}
@@ -211,6 +217,13 @@ int pfbase::do_directory(const char *directory)
 		}
 	}
 	closedir(dir);
+	if (chdir(old_dir) == -1) {
+		if (!this->silent) {
+			msg = fmt::format("getcwd({})", directory);
+			perror_xpf(msg.c_str());
+		}
+		return -1;
+	}
 	return files_matched;
 }
 
@@ -222,7 +235,7 @@ bool pfbase::set_record_length(File &file)
 	if (ret == -1) {
 		if (!this->silent) {
 			fmt::println(stderr, "filename_to_libobj({}): Failed to convert IFS path to object name",
-				file.filename);
+				file.full_filename);
 		}
 		return false;
 	}
@@ -233,7 +246,7 @@ bool pfbase::set_record_length(File &file)
 	} else if (file_record_size == 0) {
 		if (!this->silent) {
 			fmt::println(stderr, "get_pf_info({}): Couldn't get record length",
-				file.filename);
+				file.full_filename);
 		}
 		return false;
 	} else if (file_record_size < 0 && this->search_non_source_files) {
@@ -254,15 +267,16 @@ int pfbase::do_file(File &file)
 	std::string msg;
 	int matches = -1;
 	iconv_t conv = (iconv_t)(-1);
-	const char *filename = file.filename;
 
 	// Only open after we know it's a valid thing to open.
-	file.fd = open(file.filename, O_RDONLY);
+	// Note that it's safe to use short_filename because it's bound to the
+	// suffix of the full filename.
+	file.fd = open(file.short_filename.data(), O_RDONLY);
 	// We let do_file fill in the filename and CCSID. Technically a TOCTOU
 	// problem, but open(2) error reporting with IBM i objects is goofy.
 	if (file.fd == -1) {
 		if (!this->silent) {
-			msg = fmt::format("open({})", filename);
+			msg = fmt::format("open({})", file.full_filename);
 			perror_xpf(msg.c_str());
 		}
 		return -1;
@@ -271,7 +285,7 @@ int pfbase::do_file(File &file)
 	// Get member info for an accurate record count
 	if (file.record_length != 0) {
 		if (!get_member_info(file) && !this->silent) {
-			msg = fmt::format("get_member_info({})", file.filename);
+			msg = fmt::format("get_member_info({})", file.full_filename);
 			perror(msg.c_str());
 		}
 	}
@@ -314,12 +328,29 @@ fail:
 
 int pfbase::do_thing(const char *filename, bool from_recursion)
 {
+	return do_thing(filename, nullptr, from_recursion);
+}
+
+int pfbase::do_thing(const char *filename, const char *dirname, bool from_recursion)
+{
 	std::string msg;
 	int matches = 0;
 	struct stat64_ILE s = {};
 	File f = {};
 
-	f.filename = filename;
+	if (dirname != nullptr) {
+		size_t filename_pos = strlen(dirname);
+		if (dirname[filename_pos - 1] == '/') {
+			f.full_filename = fmt::format("{}{}", dirname, filename);
+		} else {
+			f.full_filename = fmt::format("{}/{}", dirname, filename);
+			filename_pos++;
+		}
+		f.short_filename = string_view(f.full_filename.c_str() + filename_pos);
+	} else {
+		f.full_filename = filename;
+		f.short_filename = f.full_filename;
+	}
 	// IBM messed up the statx declaration, it doesn't write
 	int ret = statx((char*)filename, (struct stat*)&s, sizeof(s), STX_XPFSS_PASE);
 	if (ret == -1) {
@@ -345,7 +376,7 @@ int pfbase::do_thing(const char *filename, bool from_recursion)
 				return 0;
 			}
 			visited_directories.emplace(devino);
-			int subdir_files_matched = do_directory(filename);
+			int subdir_files_matched = do_directory(f.full_filename.c_str());
 			if (subdir_files_matched >= 0) {
 				matches += subdir_files_matched;
 			}

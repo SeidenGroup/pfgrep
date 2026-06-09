@@ -141,7 +141,7 @@ public:
 private:
 	inline const char *maybe_colour(const char *colour);
 	inline void print_separator();
-	void print_filename(const char *filename, int count);
+	void print_filename(const std::string &filename, int count);
 	inline void print_line_beginning(const File &file, const Match &match);
 	bool print_line(const File &file, const Match &match);
 	optional<Match> try_patterns(const char *line, size_t line_size, int line_no);
@@ -222,7 +222,7 @@ inline void pfgrep::print_separator()
 	fmt::println("{}--", maybe_colour(PFGREP_COLON_COLOUR));
 }
 
-void pfgrep::print_filename(const char *filename, int count)
+void pfgrep::print_filename(const std::string &filename, int count)
 {
 	fmt::print("{}{}", maybe_colour(PFGREP_FILNAM_COLOUR), filename);
 	if (count > -1) {
@@ -238,7 +238,7 @@ inline void pfgrep::print_line_beginning(const File &file, const Match &match)
 	const char *colon = match.context ? "-" : ":";
 	if ((this->file_count > 1 && !this->never_print_filename) || this->always_print_filename) {
 		fmt::print("{}{}{}{}", maybe_colour(PFGREP_FILNAM_COLOUR),
-			file.filename, maybe_colour(PFGREP_COLON_COLOUR),
+			file.full_filename, maybe_colour(PFGREP_COLON_COLOUR),
 			colon);
 	}
 	if (this->print_line_numbers) {
@@ -444,11 +444,11 @@ int pfgrep::do_action(File &file)
 	}
 fail:
 	if (matches == 0 && this->print_nonmatching_files) {
-		print_filename(file.filename, -1);
+		print_filename(file.full_filename, -1);
 	} else if (matches > 0 && this->print_matching_files) {
-		print_filename(file.filename, -1);
+		print_filename(file.full_filename, -1);
 	} else if (this->print_count) {
-		print_filename(file.filename, matches);
+		print_filename(file.full_filename, matches);
 	}
 	return matches;
 }

@@ -49,12 +49,12 @@ static void usage(char *argv0)
  */
 std::string pfzip::normalize_path(const File &file)
 {
-	const char *input = file.filename;
+	const char *input = file.full_filename.c_str();
 	// Make sure the path in the zip won't be absolute.
 	if (input[0] == '/') {
 		input++;
 	}
-	std::string new_path(file.filename + 1);
+	std::string new_path(input);
 	// If requested, we can replace the generic .MBR suffix on a member
 	// with a file extension derived from the member's source type.
 	// XXX: make case insensitive, C++20
@@ -89,7 +89,7 @@ int pfzip::do_action(File &file)
 	zip_source_t *s = zip_source_buffer(this->archive, buf_copy, len, 1);
 	if (s == NULL && !this->silent) {
 		fmt::print(stderr, "zip_source_buffer({}): {}\n",
-			file.filename,
+			file.full_filename,
 			zip_strerror(this->archive));
 		return -1;
 	}
@@ -98,7 +98,7 @@ int pfzip::do_action(File &file)
 	index = zip_file_add(this->archive, path.c_str(), s, 0);
 	if (index == -1 && !this->silent) {
 		fmt::println(stderr, "zip_file_add({}): {}",
-			file.filename,
+			file.full_filename,
 			zip_strerror(this->archive));
 		zip_source_free(s);
 		return -1;
@@ -123,13 +123,13 @@ int pfzip::do_action(File &file)
 	nonfatal_ret = zip_file_set_comment(this->archive, index, comment.c_str(), comment.size(), 0);
 	if (nonfatal_ret && !this->silent) {
 		fmt::println(stderr, "zip_file_set_comment: Can't set comment for {}",
-			file.filename);
+			file.full_filename);
 	}
 	nonfatal_ret = zip_file_set_mtime(this->archive, index, file.mtime, 0);
 	if (nonfatal_ret && !this->silent) {
 		fmt::println(stderr, "zip_file_set_comment: Can't set modification time ({}) for {}",
 			file.mtime,
-			file.filename);
+			file.full_filename);
 	}
 	return 1;
 }

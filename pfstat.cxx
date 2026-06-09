@@ -28,12 +28,12 @@ int pfstat::do_action(File &file)
 		// Better off using i.e. stat
 		if (this->silent) {
 			fmt::println(stderr, "{}: Not a member",
-				file.filename);
+				file.full_filename);
 		}
 		return -1;
 	}
 	fmt::println("{}\t{}\t{}\t{}\t{}\t{}",
-		file.filename,
+		file.full_filename,
 		file.file_size,
 		file.source_type,
 		file.record_length,

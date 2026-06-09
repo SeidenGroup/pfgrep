@@ -59,8 +59,8 @@ extern "C" int filename_to_libobj(File &file)
 	} input_qlg  = {};
 
 	iconv_t a2e = get_pase_to_system_iconv();
-	char *in = (char*)file.filename, *out = input_qlg.path;
-	size_t inleft = strlen(file.filename), outleft = 1024;
+	char *in = (char*)file.full_filename.c_str(), *out = input_qlg.path;
+	size_t inleft = file.full_filename.size(), outleft = 1024;
 	iconv(a2e, &in, &inleft, &out, &outleft);
 
 	// /QSYS.LIB/... path names are coerced to 37
