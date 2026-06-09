@@ -11,7 +11,7 @@ PCRE2_LDFLAGS := $(shell pkg-config --libs libpcre2-8)
 ZIP_CFLAGS := $(shell pkg-config --cflags libzip)
 ZIP_LDFLAGS := $(shell pkg-config --libs libzip)
 PASECPP_CFLAGS := -Iinclude/pase-cpp -DPASE_CPP_NO_FORK
-FMT_CFLAGS := -Iinclude/fmt/include -DFMT_USE_LOCALE=0
+FMT_CFLAGS := -Iinclude/fmt/include -DFMT_USE_LOCALE=0 -Wno-attributes -Wno-error=attributes
 
 DEPS_CFLAGS := $(PCRE2_CFLAGS) $(ZIP_CFLAGS) $(PASECPP_CFLAGS) $(FMT_CFLAGS)
 DEPS_LDFLAGS := $(PCRE2_LDFLAGS) $(ZIP_LDFLAGS)
