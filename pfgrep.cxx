@@ -466,10 +466,11 @@ bool pfgrep::compile_pattern(const std::string &expr)
 	if (re == nullptr) {
 		PCRE2_UCHAR buffer[256];
 		pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
-		fmt::println(stderr, "Failed to compile regular expression \"{}\" at offset {}: {}",
-				expr,
+		fmt::println(stderr, "Failed to compile regular expression at offset {}: {}",
 				(int)erroroffset,
 				(const char*)buffer);
+		fmt::println(stderr, "  {}", expr);
+		fmt::println(stderr, "  {}^", std::string(erroroffset - 0, ' '));
 		return false;
 	}
 
