@@ -369,8 +369,24 @@ int pfgrep::do_action(File &file)
 				desc_size--;
 			}
 		}
-		optional<Match> match = try_patterns(file.description, desc_size, 0);
-		if (match != nullopt) {
+		optional<Match> match;
+		try {
+			match = try_patterns(file.description, desc_size, 0);
+		} catch (PCRE2Error pcre2error) {
+			if (!this->silent) {
+				PCRE2_UCHAR buffer[256];
+				pcre2_get_error_message(rc, buffer, sizeof(buffer));
+				fmt::print(stderr, "failed match error: {} ({})", (const char*)buffer, pcre2error.rc);
+			}
+			goto fail;
+		}
+		// Simplified from main loop below as we don't need context
+		bool matched = match != nullopt;
+		if ((matched && !this->invert) || (!matched && this->invert)) {
+			const bool has_context_lines = this->after_lines || before_lines;
+			if (has_context_lines && this->has_printed) {
+				print_separator();
+			}
 			this->has_printed |= print_line(file, *match);
 			last_printed_line = 0;
 			matches = 1;
