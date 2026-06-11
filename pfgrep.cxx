@@ -100,6 +100,14 @@ public:
 	int rc;
 };
 
+enum PrintMode {
+	ModeNormal,
+	ModeSubstrings,
+	ModeLineCount,
+	ModeMatchingFilenames,
+	ModeNonmatchingFilenames,
+};
+
 class pfgrep : public pfbase {
 public:
 	~pfgrep();
@@ -119,10 +127,7 @@ public:
 	uint32_t biggest_capture_count = 0;
 	bool can_jit = false;
 	/* Options */
-	bool print_matching_files = false;
-	bool print_nonmatching_files = false;
-	bool print_count = false;
-	bool print_only_substrings = false;
+	PrintMode mode = ModeNormal;
 	bool case_insensitive = false;
 	bool always_print_filename = false;
 	bool never_print_filename = false;
@@ -250,17 +255,18 @@ inline void pfgrep::print_line_beginning(const File &file, const Match &match)
 
 bool pfgrep::print_line(const File &file, const Match &match)
 {
-	if (this->quiet && !this->print_count) {
+	if (this->quiet) {
 		// Special case: Early return since we don't
 		// to count or print more lines
 		return false;
-	} else if (!this->quiet && this->print_only_substrings && match.substrings.size()) {
+	} else if (this->mode == ModeSubstrings && match.substrings.size()) {
 		for (const auto& substring : match.substrings) {
 			print_line_beginning(file, match);
 			fmt::println("{}{}{}", maybe_colour(PFGREP_MATCH_COLOUR),
 				substring, maybe_colour(PFGREP_NORMAL_COLOUR));
 		}
-	} else if (!this->quiet) {
+		return true;
+	} else if (this->mode == ModeNormal) {
 		print_line_beginning(file, match);
 		if (this->colourize == ColourizeAlways && match.substrings.size()) {
 			size_t last_substring_end = 0;
@@ -279,9 +285,10 @@ bool pfgrep::print_line(const File &file, const Match &match)
 			fmt::println("{}{}", maybe_colour(PFGREP_NORMAL_COLOUR),
 				string_view(match.line, match.length));
 		}
+		return true;
 	}
-	this->has_printed = true;
-	return true;
+	// For (non)matching and line count, printing is done at end of action
+	return false;
 }
 
 optional<Match> pfgrep::try_patterns(const char *line, size_t line_size, int line_no)
@@ -366,7 +373,7 @@ int pfgrep::do_action(File &file)
 		}
 		optional<Match> match = try_patterns(file.description, desc_size, 0);
 		if (match != nullopt) {
-			print_line(file, *match);
+			this->has_printed |= print_line(file, *match);
 			last_printed_line = 0;
 		}
 	}
@@ -399,9 +406,7 @@ int pfgrep::do_action(File &file)
 			goto fail;
 		}
 
-		if (match != nullopt) {
-			matched = true;
-		}
+		matched = match != nullopt;
 		if ((matched && !this->invert) || (!matched && this->invert)) {
 			matches++;
 			current_after_lines = this->after_lines;
@@ -419,11 +424,15 @@ int pfgrep::do_action(File &file)
 			}
 			before_queue.clear();
 
-			if (matched && !print_line(file, *match)) {
-				goto fail;
-			} else if (!matched && !print_line(file,
-					Match(line, conv_size, lineno, false))) {
-				goto fail;
+			if (matched) {
+				this->has_printed |= print_line(file, *match);
+				// Early return if we just need one match
+				// (the case for -q and -l flags)
+				if (this->quiet || this->mode == ModeMatchingFilenames) {
+					break;
+				}
+			} else {
+				this->has_printed |= print_line(file, Match(line, conv_size, lineno, false));
 			}
 		} else if (current_after_lines-- > 0) {
 			last_printed_line = lineno;
@@ -443,11 +452,11 @@ int pfgrep::do_action(File &file)
 		line = next;
 	}
 fail:
-	if (matches == 0 && this->print_nonmatching_files) {
+	if (matches == 0 && this->mode == ModeNonmatchingFilenames) {
 		print_filename(file.full_filename, -1);
-	} else if (matches > 0 && this->print_matching_files) {
+	} else if (matches > 0 && this->mode == ModeMatchingFilenames) {
 		print_filename(file.full_filename, -1);
-	} else if (this->print_count) {
+	} else if (this->mode == ModeLineCount) {
 		print_filename(file.full_filename, matches);
 	}
 	return matches;
@@ -566,10 +575,7 @@ int main(int argc, char **argv)
 			state.before_lines = state.after_lines;
 			break;
 		case 'c':
-			state.print_count = true;
-			state.print_matching_files = false;
-			state.print_nonmatching_files = false;
-			state.quiet = true; // Implied
+			state.mode = ModeLineCount;
 			break;
 		case 'd':
 			state.search_descriptions = true;
@@ -592,16 +598,10 @@ int main(int argc, char **argv)
 			state.never_print_filename = true;
 			break;
 		case 'L':
-			state.print_count = false;
-			state.print_matching_files = false;
-			state.print_nonmatching_files = true;
-			state.quiet = true; // Implied
+			state.mode = ModeNonmatchingFilenames;
 			break;
 		case 'l':
-			state.print_count = false;
-			state.print_matching_files = true;
-			state.print_nonmatching_files = false;
-			state.quiet = true; // Implied
+			state.mode = ModeMatchingFilenames;
 			break;
 		case 'i':
 			state.case_insensitive = true;
@@ -613,7 +613,7 @@ int main(int argc, char **argv)
 			state.print_line_numbers = true;
 			break;
 		case 'o':
-			state.print_only_substrings = true;
+			state.mode = ModeSubstrings;
 			break;
 		case 'p':
 			state.search_non_source_files = true;
