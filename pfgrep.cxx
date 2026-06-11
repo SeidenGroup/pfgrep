@@ -101,6 +101,7 @@ public:
 };
 
 enum PrintMode {
+	ModeQuiet,
 	ModeNormal,
 	ModeSubstrings,
 	ModeLineCount,
@@ -255,11 +256,7 @@ inline void pfgrep::print_line_beginning(const File &file, const Match &match)
 
 bool pfgrep::print_line(const File &file, const Match &match)
 {
-	if (this->quiet) {
-		// Special case: Early return since we don't
-		// to count or print more lines
-		return false;
-	} else if (this->mode == ModeSubstrings && match.substrings.size()) {
+	if (this->mode == ModeSubstrings && match.substrings.size()) {
 		for (const auto& substring : match.substrings) {
 			print_line_beginning(file, match);
 			fmt::println("{}{}{}", maybe_colour(PFGREP_MATCH_COLOUR),
@@ -287,7 +284,8 @@ bool pfgrep::print_line(const File &file, const Match &match)
 		}
 		return true;
 	}
-	// For (non)matching and line count, printing is done at end of action
+	// For (non)matching and line count, printing is done at end of action,
+	// and for quiet, we don't print anything at all
 	return false;
 }
 
@@ -375,6 +373,7 @@ int pfgrep::do_action(File &file)
 		if (match != nullopt) {
 			this->has_printed |= print_line(file, *match);
 			last_printed_line = 0;
+			matches = 1;
 		}
 	}
 
@@ -428,7 +427,7 @@ int pfgrep::do_action(File &file)
 				this->has_printed |= print_line(file, *match);
 				// Early return if we just need one match
 				// (the case for -q and -l flags)
-				if (this->quiet || this->mode == ModeMatchingFilenames) {
+				if (this->mode == ModeQuiet || this->mode == ModeMatchingFilenames) {
 					break;
 				}
 			} else {
@@ -619,7 +618,7 @@ int main(int argc, char **argv)
 			state.search_non_source_files = true;
 			break;
 		case 'q':
-			state.quiet = true;
+			state.mode = ModeQuiet;
 			break;
 		case 'r':
 			state.recurse = true;

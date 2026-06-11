@@ -87,7 +87,6 @@ public:
 	bool search_non_source_files = false;
 	bool dont_trim_ending_whitespace = false;
 	// Note quiet does not imply silent et vice versa
-	bool quiet = false; // No output on successful match
 	bool silent = false; // No output on errors
 	bool recurse = false;
 	/* Stat options */
