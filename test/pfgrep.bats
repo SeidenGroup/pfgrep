@@ -2,6 +2,9 @@ setup() {
 	load 'test_helper/bats-support/load'
 	load 'test_helper/bats-assert/load'
 
+	# for run -N
+	bats_require_minimum_version 1.5.0
+
 	# get the containing directory of this file
 	# use $BATS_TEST_FILENAME instead of ${BASH_SOURCE[0]} or $0,
 	# as those will point to the bats executable's location or the preprocessed file respectively
@@ -136,6 +139,28 @@ EOF
 	run pfgrep -c 'AB' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
 
 	assert_output "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR:4"
+}
+
+@test "matching filenames" {
+	run pfgrep -l 'FOOBAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR"
+
+	assert_output "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+}
+
+@test "nonmatching filenames" {
+	run pfgrep -L 'FOOBAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR" "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR"
+
+	assert_output "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR"
+}
+
+@test "quiet exit code" {
+	run -0 pfgrep -q 'FOOBAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/ABC.MBR"
+
+	assert_output ""
+
+	run -1 pfgrep -q 'FOOBAR' "/QSYS.LIB/$TESTLIB.LIB/QTXTSRC.FILE/XYZ.MBR"
+
+	assert_output ""
 }
 
 @test "forcing file names and line numbers" {
