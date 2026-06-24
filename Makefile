@@ -1,4 +1,9 @@
+# Built-in rules for .c and .cc trigger instead otherwise since we added %.d
+# (the other way to fix this is to nop out the built-in rules as needed)
+MAKEFLAGS += -r
+
 VERSION := 0.6
+VERSION_CFLAGS := -DPFGREP_VERSION=\"$(VERSION)\"
 
 # DESTDIR can be set as well
 PREFIX := /QOpenSys/pkgs
@@ -19,12 +24,12 @@ DEPS_LDFLAGS := $(PCRE2_LDFLAGS) $(ZIP_LDFLAGS)
 # Build with warnings as errors and symbols for developers,
 # build with optimizations for release builds.
 ifdef DEBUG
-CFLAGS := -std=gnu11 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
-CXXFLAGS := -std=c++14 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
+CFLAGS := $(VERSION_CFLAGS) -std=gnu11 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
+CXXFLAGS := $(VERSION_CFLAGS) -std=c++14 -Wall -Wextra -Werror -Wno-error=unused-function -g -Og -DDEBUG
 LDFLAGS := -g -O0
 else
-CFLAGS := -std=gnu11 -Wall -Wextra -O2
-CXXFLAGS := -std=c++14 -Wall -Wextra -O2
+CFLAGS := $(VERSION_CFLAGS) -std=gnu11 -Wall -Wextra -O2
+CXXFLAGS := $(VERSION_CFLAGS) -std=c++14 -Wall -Wextra -O2
 LDFLAGS := -O2
 endif
 
@@ -38,7 +43,6 @@ AR := ar
 
 all: pfgrep pfcat pfstat pfzip
 
-#libfmt.a: include/fmt/src/fmt-c.o include/fmt/src/format.o include/fmt/src/os.o
 libfmt.a: include/fmt/src/format.o
 	$(AR) -X64 cru $@ $^
 
@@ -57,17 +61,35 @@ pfstat: pfstat.o libpf.a libfmt.a
 pfzip: pfzip.o libpf.a libfmt.a
 	$(LD) $(DEPS_LDFLAGS) $(LDFLAGS) -o $@ $^ /QOpenSys/usr/lib/libiconv.a
 
-%.o: %.c
-	$(CC) $(DEPS_CFLAGS) $(CFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+%.o: %.c %.d
+	$(CC) $(AUTODEPS_FLAGS) $(DEPS_CFLAGS) $(CFLAGS) -c -o $@ $<
 
-%.o: %.cc
-	$(CXX) $(DEPS_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+%.o: %.cc %.d
+	$(CXX) $(AUTODEPS_FLAGS) $(DEPS_CFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-%.o: %.cxx
-	$(CXX) $(DEPS_CFLAGS) $(CXXFLAGS) -DPFGREP_VERSION=\"$(VERSION)\" -c -o $@ $^
+%.o: %.cxx %.d
+	$(CXX) $(AUTODEPS_FLAGS) $(DEPS_CFLAGS) $(CXXFLAGS) -c -o $@ $<
+
+%.d: %.c
+	$(CC) $(AUTODEPS_FLAGS) $(DEPS_CFLAGS) $(CFLAGS) -MM -MT '$(patsubst %.c,%.o,$<)' $< -MF $@
+
+%.d: %.cc
+	$(CXX) $(AUTODEPS_FLAGS) $(DEPS_CFLAGS) $(CXXFLAGS) -MM -MT '$(patsubst %.cc,%.o,$<)' $< -MF $@
+
+%.d: %.cxx
+	$(CXX) $(AUTODEPS_FLAGS) $(DEPS_CFLAGS) $(CXXFLAGS) -MM -MT '$(patsubst %.cxx,%.o,$<)' $< -MF $@
+
+# We need all the .o files we make, even though we avoid a big SRC variable
+# slurry for actual targets
+ALL_C := $(wildcard *.c)
+ALL_CXX := $(wildcard *.cxx)
+# Special case libfmt since it's a .cc...
+ALL_OBJS := $(ALL_C:.c=.o) $(ALL_CXX:.cxx=.o) include/fmt/src/format.o
+AUTODEP_FILES := $(ALL_OBJS:%.o=%.d)
+$(AUTODEP_FILES): # So we don't get eaten by make as intermediate files
 
 clean:
-	rm -f *.o include/fmt/src/*.o *.a pfgrep pfcat pfstat pfcat core *.tar *.tar.gz
+	rm -f $(ALL_OBJS) $(AUTODEP_FILES) *.a pfgrep pfcat pfstat pfcat core *.tar *.tar.gz
 
 check: pfgrep pfcat pfzip
 	TESTLIB=$(TESTLIB) ./test/bats/bin/bats -T test/pfgrep.bats test/pfcat.bats test/pfzip.bats
@@ -89,3 +111,5 @@ dist:
 	git archive --prefix=pfgrep-$(VERSION)/ --format=tar -o pfgrep-$(VERSION).tar HEAD Makefile README.md COPYING *.c *.cxx *.h *.hxx *.1
 	git submodule foreach --recursive "git archive --prefix=pfgrep-$(VERSION)/"'$$path'"/ --output="'$$sha1'".tar HEAD && tar --concatenate --file=$(shell pwd)/pfgrep-$(VERSION).tar "'$$sha1'".tar && rm "'$$sha1'".tar"
 	gzip pfgrep-$(VERSION).tar
+
+include $(AUTODEP_FILES)
